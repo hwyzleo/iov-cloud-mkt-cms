@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.AgreementCurrentMapper">
+
+    <resultMap id="currentResultMap" type="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.AgreementCurrentPo">
+        <result column="scene" property="scene"/>
+        <result column="market" property="market"/>
+        <result column="locale" property="locale"/>
+        <result column="brand_code" property="brandCode"/>
+        <result column="car_line_code" property="carLineCode"/>
+        <result column="bundle_id" property="bundleId"/>
+        <result column="lock_version" property="lockVersion"/>
+        <result column="updated_at" property="updatedAt"
+                typeHandler="net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler"/>
+    </resultMap>
+
+    <insert id="insertPo">
+        INSERT INTO cms_agreement_current (
+            scene, market, locale, brand_code, car_line_code, bundle_id, lock_version, updated_at
+        ) VALUES (
+            #{scene}, #{market}, #{locale}, #{brandCode}, #{carLineCode}, #{bundleId}, #{lockVersion},
+            #{updatedAt,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler}
+        )
+    </insert>
+
+    <!-- 锁顺序一致：所有发布路径都先锁本行，再读取幂等结果与当前包 -->
+    <select id="selectForUpdate" resultMap="currentResultMap">
+        SELECT scene, market, locale, brand_code, car_line_code, bundle_id, lock_version, updated_at
+        FROM cms_agreement_current
+        WHERE scene = #{scene}
+          AND market = #{market}
+          AND locale = #{locale}
+          AND brand_code = #{brandCode}
+          AND car_line_code = #{carLineCode}
+        FOR UPDATE
+    </select>
+
+    <update id="switchPointer">
+        UPDATE cms_agreement_current
+        SET bundle_id = #{newBundleId},
+            lock_version = lock_version + 1,
+            updated_at = #{now,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler}
+        WHERE scene = #{scene}
+          AND market = #{market}
+          AND locale = #{locale}
+          AND brand_code = #{brandCode}
+          AND car_line_code = #{carLineCode}
+          AND lock_version = #{expectedLockVersion}
+    </update>
+
+    <insert id="insertOperationPo" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cms_agreement_operation (
+            operation_id, action, object_type, object_id, operator, operated_at, result, trace_id
+        ) VALUES (
+            #{operationId}, #{action}, #{objectType}, #{objectId}, #{operator},
+            #{operatedAt,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler},
+            #{result}, #{traceId}
+        )
+    </insert>
+
+</mapper>

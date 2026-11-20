@@ -1,0 +1,36 @@
+# MKT-CMS 协议内容子域配置（MKT-CMS-DSN-CR-001）
+# 本文件只承载非敏感逻辑开关与固定语义；数据源凭据经 Nacos 共享配置注入，不在此保存。
+
+# FW-WEB 时间治理：显式业务时区，禁止 systemDefault 猜测（全 UTC 栈）
+iov:
+  web:
+    jackson:
+      zone-id: ${IOV_JACKSON_ZONE_ID:UTC}
+  mysql:
+    # FW-MYSQL-DSN-CR-003：新服务显式 fail，Mapper 语句缺失在业务流量前阻断启动（早失败）
+    mapper-validation:
+      mode: fail
+
+spring:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+mybatis-plus:
+  mapper-locations: classpath*:mappers/*.xml
+  type-aliases-package: net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po
+
+cms:
+  agreement:
+    html:
+      # 输入与输出各不超过 1 MiB（§3.1.1）；端侧联调可调整，但不得无上限
+      max-input-bytes: ${CMS_AGREEMENT_MAX_INPUT_BYTES:1048576}
+      max-output-bytes: ${CMS_AGREEMENT_MAX_OUTPUT_BYTES:1048576}
+    supported:
+      # 首版只开放这组值；后续启用其他语言/市场/品牌/车系按受支持清单扩展，不重建历史身份
+      locales: ${CMS_AGREEMENT_SUPPORTED_LOCALES:zh-CN}
+      markets: ${CMS_AGREEMENT_SUPPORTED_MARKETS:DEFAULT}
+      brands: ${CMS_AGREEMENT_SUPPORTED_BRANDS:DEFAULT}
+      car-lines: ${CMS_AGREEMENT_SUPPORTED_CAR_LINES:DEFAULT}
+      # 品牌 → 车系归属（BRAND:CAR_LINE，逗号分隔）；DEFAULT 品牌只允许 DEFAULT 车系
+      brand-car-lines: ${CMS_AGREEMENT_SUPPORTED_BRAND_CAR_LINES:}

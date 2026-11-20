@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>net.hwyz.iov.cloud.parent</groupId>
+        <artifactId>service</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>net.hwyz.iov.cloud.mkt</groupId>
+    <artifactId>mkt-cms-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <properties>
+        <cms.version>0.0.1-SNAPSHOT</cms.version>
+        <!-- Parent BOM 未代管 jsoup 版本，本模块显式锁定（MKT-CMS-DSN-CR-001 §3.1.1） -->
+        <jsoup.version>1.19.1</jsoup.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.hwyz.iov.cloud.mkt</groupId>
+            <artifactId>mkt-cms-api</artifactId>
+            <version>${cms.version}</version>
+        </dependency>
+
+        <!-- 框架: MySQL -->
+        <dependency>
+            <groupId>net.hwyz.iov.cloud.framework</groupId>
+            <artifactId>framework-mysql-starter</artifactId>
+        </dependency>
+
+        <!-- 框架: 安全 -->
+        <dependency>
+            <groupId>net.hwyz.iov.cloud.framework</groupId>
+            <artifactId>framework-security-starter</artifactId>
+        </dependency>
+
+        <!-- 框架: 审计 -->
+        <dependency>
+            <groupId>net.hwyz.iov.cloud.framework</groupId>
+            <artifactId>framework-audit-starter</artifactId>
+        </dependency>
+
+        <!-- 数据库迁移：Flyway -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
+        <!--
+          MKT-CMS-DSN-CR-001 §5.2：发布一致性只在 CMS 单库事务内完成，
+          首版不引入 Kafka / Outbox 等不必要基础设施，故不声明 framework-kafka-starter。
+        -->
+
+        <!-- 安全 HTML 解析与允许列表清洗（MKT-CMS-DSN-CR-001 §3.1.1）：成熟解析器，禁止用正则充当 HTML 安全解析器 -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>${jsoup.version}</version>
+        </dependency>
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skip>false</skip>
+                    <!-- FW-MYSQL/FW-WEB 时间治理启动探针要求 JVM 时区 UTC（仅测试环境） -->
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                    <systemPropertyVariables>
+                        <user.timezone>UTC</user.timezone>
+                        <!-- 测试不访问 Nacos：配置由 test/resources 与测试属性显式提供 -->
+                        <spring.cloud.nacos.config.enabled>false</spring.cloud.nacos.config.enabled>
+                        <spring.cloud.nacos.discovery.enabled>false</spring.cloud.nacos.discovery.enabled>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

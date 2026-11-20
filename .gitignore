@@ -22,3 +22,10 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+.idea/
+# Maven build output
+target/
+
+# graphify 代码图谱产物（生成物，不入库）
+graphify-out/

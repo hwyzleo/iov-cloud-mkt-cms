@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.AgreementRevisionMapper">
+
+    <resultMap id="revisionResultMap" type="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.AgreementRevisionPo">
+        <id column="id" property="id"/>
+        <result column="revision_id" property="revisionId"/>
+        <result column="agreement_code" property="agreementCode"/>
+        <result column="agreement_type" property="agreementType"/>
+        <result column="scene" property="scene"/>
+        <result column="market" property="market"/>
+        <result column="locale" property="locale"/>
+        <result column="brand_code" property="brandCode"/>
+        <result column="car_line_code" property="carLineCode"/>
+        <result column="title" property="title"/>
+        <result column="version" property="version"/>
+        <result column="agreement_date" property="agreementDate"/>
+        <result column="content_type" property="contentType"/>
+        <result column="body" property="body"/>
+        <result column="content_hash" property="contentHash"/>
+        <result column="sanitizer_version" property="sanitizerVersion"/>
+        <result column="source_draft_id" property="sourceDraftId"/>
+        <result column="source_draft_version" property="sourceDraftVersion"/>
+        <result column="frozen_by" property="frozenBy"/>
+        <result column="frozen_at" property="frozenAt"
+                typeHandler="net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler"/>
+    </resultMap>
+
+    <sql id="baseColumnList">
+        id, revision_id, agreement_code, agreement_type, scene, market, locale, brand_code, car_line_code,
+        title, version, agreement_date, content_type, body, content_hash, sanitizer_version,
+        source_draft_id, source_draft_version, frozen_by, frozen_at
+    </sql>
+
+    <insert id="insertPo" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cms_agreement_revision (
+            revision_id, agreement_code, agreement_type, scene, market, locale, brand_code, car_line_code,
+            title, version, agreement_date, content_type, body, content_hash, sanitizer_version,
+            source_draft_id, source_draft_version, frozen_by, frozen_at
+        ) VALUES (
+            #{revisionId}, #{agreementCode}, #{agreementType}, #{scene}, #{market}, #{locale}, #{brandCode},
+            #{carLineCode}, #{title}, #{version}, #{agreementDate}, #{contentType}, #{body}, #{contentHash},
+            #{sanitizerVersion}, #{sourceDraftId}, #{sourceDraftVersion}, #{frozenBy},
+            #{frozenAt,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler}
+        )
+    </insert>
+
+    <select id="selectByRevisionId" resultMap="revisionResultMap">
+        SELECT <include refid="baseColumnList"/>
+        FROM cms_agreement_revision
+        WHERE revision_id = #{revisionId}
+    </select>
+
+    <select id="selectBySourceDraft" resultMap="revisionResultMap">
+        SELECT <include refid="baseColumnList"/>
+        FROM cms_agreement_revision
+        WHERE source_draft_id = #{sourceDraftId}
+          AND source_draft_version = #{sourceDraftVersion}
+    </select>
+
+    <select id="selectPublishedByRevisionId" resultMap="revisionResultMap">
+        SELECT r.id, r.revision_id, r.agreement_code, r.agreement_type, r.scene, r.market, r.locale,
+               r.brand_code, r.car_line_code, r.title, r.version, r.agreement_date, r.content_type, r.body,
+               r.content_hash, r.sanitizer_version, r.source_draft_id, r.source_draft_version, r.frozen_by,
+               r.frozen_at
+        FROM cms_agreement_revision r
+        WHERE r.revision_id = #{revisionId}
+          AND EXISTS (
+              SELECT 1 FROM cms_agreement_bundle b
+              WHERE b.privacy_revision_id = r.revision_id
+                 OR b.user_revision_id = r.revision_id
+          )
+    </select>
+
+</mapper>

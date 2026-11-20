@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.AgreementBundleMapper">
+
+    <resultMap id="bundleResultMap" type="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.AgreementBundlePo">
+        <id column="id" property="id"/>
+        <result column="bundle_id" property="bundleId"/>
+        <result column="scene" property="scene"/>
+        <result column="market" property="market"/>
+        <result column="locale" property="locale"/>
+        <result column="brand_code" property="brandCode"/>
+        <result column="car_line_code" property="carLineCode"/>
+        <result column="privacy_revision_id" property="privacyRevisionId"/>
+        <result column="user_revision_id" property="userRevisionId"/>
+        <result column="published_by" property="publishedBy"/>
+        <result column="published_at" property="publishedAt"
+                typeHandler="net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler"/>
+        <result column="request_id" property="requestId"/>
+        <result column="request_hash" property="requestHash"/>
+        <result column="expected_bundle_id" property="expectedBundleId"/>
+    </resultMap>
+
+    <resultMap id="currentViewResultMap"
+               type="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.CurrentBundleViewPo">
+        <result column="bundle_id" property="bundleId"/>
+        <result column="scene" property="scene"/>
+        <result column="market" property="market"/>
+        <result column="locale" property="locale"/>
+        <result column="brand_code" property="brandCode"/>
+        <result column="car_line_code" property="carLineCode"/>
+        <result column="published_at" property="publishedAt"
+                typeHandler="net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler"/>
+        <result column="p_revision_id" property="pRevisionId"/>
+        <result column="p_agreement_code" property="pAgreementCode"/>
+        <result column="p_agreement_type" property="pAgreementType"/>
+        <result column="p_title" property="pTitle"/>
+        <result column="p_version" property="pVersion"/>
+        <result column="p_agreement_date" property="pAgreementDate"/>
+        <result column="p_content_type" property="pContentType"/>
+        <result column="p_body" property="pBody"/>
+        <result column="p_content_hash" property="pContentHash"/>
+        <result column="p_sanitizer_version" property="pSanitizerVersion"/>
+        <result column="p_locale" property="pLocale"/>
+        <result column="p_scene" property="pScene"/>
+        <result column="p_market" property="pMarket"/>
+        <result column="p_brand_code" property="pBrandCode"/>
+        <result column="p_car_line_code" property="pCarLineCode"/>
+        <result column="u_revision_id" property="uRevisionId"/>
+        <result column="u_agreement_code" property="uAgreementCode"/>
+        <result column="u_agreement_type" property="uAgreementType"/>
+        <result column="u_title" property="uTitle"/>
+        <result column="u_version" property="uVersion"/>
+        <result column="u_agreement_date" property="uAgreementDate"/>
+        <result column="u_content_type" property="uContentType"/>
+        <result column="u_body" property="uBody"/>
+        <result column="u_content_hash" property="uContentHash"/>
+        <result column="u_sanitizer_version" property="uSanitizerVersion"/>
+        <result column="u_locale" property="uLocale"/>
+        <result column="u_scene" property="uScene"/>
+        <result column="u_market" property="uMarket"/>
+        <result column="u_brand_code" property="uBrandCode"/>
+        <result column="u_car_line_code" property="uCarLineCode"/>
+    </resultMap>
+
+    <sql id="baseColumnList">
+        id, bundle_id, scene, market, locale, brand_code, car_line_code, privacy_revision_id, user_revision_id,
+        published_by, published_at, request_id, request_hash, expected_bundle_id
+    </sql>
+
+    <insert id="insertPo" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cms_agreement_bundle (
+            bundle_id, scene, market, locale, brand_code, car_line_code, privacy_revision_id, user_revision_id,
+            published_by, published_at, request_id, request_hash, expected_bundle_id
+        ) VALUES (
+            #{bundleId}, #{scene}, #{market}, #{locale}, #{brandCode}, #{carLineCode}, #{privacyRevisionId},
+            #{userRevisionId}, #{publishedBy},
+            #{publishedAt,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler},
+            #{requestId}, #{requestHash}, #{expectedBundleId}
+        )
+    </insert>
+
+    <select id="selectByBundleId" resultMap="bundleResultMap">
+        SELECT <include refid="baseColumnList"/>
+        FROM cms_agreement_bundle
+        WHERE bundle_id = #{bundleId}
+    </select>
+
+    <select id="selectByRequestId" resultMap="bundleResultMap">
+        SELECT <include refid="baseColumnList"/>
+        FROM cms_agreement_bundle
+        WHERE request_id = #{requestId}
+    </select>
+
+    <select id="selectByRequestIdForUpdate" resultMap="bundleResultMap">
+        SELECT <include refid="baseColumnList"/>
+        FROM cms_agreement_bundle
+        WHERE request_id = #{requestId}
+        FOR UPDATE
+    </select>
+
+    <!-- 一次一致性读取：当前指针 + 发布包 + 两份修订（不两次分别查询“最新协议”） -->
+    <select id="selectCurrentView" resultMap="currentViewResultMap">
+        SELECT c.bundle_id                 AS bundle_id,
+               b.scene                     AS scene,
+               b.market                    AS market,
+               b.locale                    AS locale,
+               b.brand_code                AS brand_code,
+               b.car_line_code             AS car_line_code,
+               b.published_at              AS published_at,
+               p.revision_id               AS p_revision_id,
+               p.agreement_code            AS p_agreement_code,
+               p.agreement_type            AS p_agreement_type,
+               p.title                     AS p_title,
+               p.version                   AS p_version,
+               p.agreement_date            AS p_agreement_date,
+               p.content_type              AS p_content_type,
+               p.body                      AS p_body,
+               p.content_hash              AS p_content_hash,
+               p.sanitizer_version         AS p_sanitizer_version,
+               p.locale                    AS p_locale,
+               p.scene                     AS p_scene,
+               p.market                    AS p_market,
+               p.brand_code                AS p_brand_code,
+               p.car_line_code             AS p_car_line_code,
+               u.revision_id               AS u_revision_id,
+               u.agreement_code            AS u_agreement_code,
+               u.agreement_type            AS u_agreement_type,
+               u.title                     AS u_title,
+               u.version                   AS u_version,
+               u.agreement_date            AS u_agreement_date,
+               u.content_type              AS u_content_type,
+               u.body                      AS u_body,
+               u.content_hash              AS u_content_hash,
+               u.sanitizer_version         AS u_sanitizer_version,
+               u.locale                    AS u_locale,
+               u.scene                     AS u_scene,
+               u.market                    AS u_market,
+               u.brand_code                AS u_brand_code,
+               u.car_line_code             AS u_car_line_code
+        FROM cms_agreement_current c
+                 JOIN cms_agreement_bundle b ON b.bundle_id = c.bundle_id
+                 JOIN cms_agreement_revision p ON p.revision_id = b.privacy_revision_id
+                 JOIN cms_agreement_revision u ON u.revision_id = b.user_revision_id
+        WHERE c.scene = #{scene}
+          AND c.market = #{market}
+          AND c.locale = #{locale}
+          AND c.brand_code = #{brandCode}
+          AND c.car_line_code = #{carLineCode}
+    </select>
+
+</mapper>
