@@ -1,7 +1,9 @@
 package net.hwyz.iov.cloud.mkt.cms.service.domain.repository;
 
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementDraft;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementSearchCriteria;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -35,4 +37,12 @@ public interface AgreementDraftRepository {
      * @return 草稿
      */
     Optional<AgreementDraft> findByDraftId(String draftId);
+
+    /**
+     * 条件检索草稿（列表不返回正文；分页由调用方通过 PageHelper 在数据库阶段介入）
+     *
+     * @param criteria 检索条件
+     * @return 草稿列表（不含正文）
+     */
+    List<AgreementDraft> search(AgreementSearchCriteria criteria);
 }

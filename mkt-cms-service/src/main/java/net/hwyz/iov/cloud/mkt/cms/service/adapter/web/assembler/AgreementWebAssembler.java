@@ -5,16 +5,25 @@ import net.hwyz.iov.cloud.mkt.cms.api.vo.response.AgreementContentResponse;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.CreateAgreementDraftRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.PublishAgreementBundleRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.UpdateAgreementDraftRequest;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementBundleSummaryResponse;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementCurrentBundleResponse;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementDraftResponse;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementDraftSummaryResponse;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementMetadataResponse;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementPublishResponse;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementRevisionResponse;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementRevisionSummaryResponse;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.CreateAgreementDraftCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.PublishAgreementBundleCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.UpdateAgreementDraftCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleContentResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleSummaryResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementDraftResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementDraftSummaryResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementMetadataResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementRevisionResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementRevisionSummaryResult;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -174,6 +183,145 @@ public final class AgreementWebAssembler {
                 .requestId(result.getRequestId())
                 .requestHash(result.getRequestHash())
                 .expectedBundleId(result.getExpectedBundleId())
+                .build();
+    }
+
+    /**
+     * 草稿列表项转 VO
+     *
+     * @param result 列表项
+     * @return VO
+     */
+    public static AgreementDraftSummaryResponse toVo(AgreementDraftSummaryResult result) {
+        return AgreementDraftSummaryResponse.builder()
+                .draftId(result.getDraftId())
+                .agreementType(result.getAgreementType())
+                .scene(result.getScene())
+                .market(result.getMarket())
+                .locale(result.getLocale())
+                .brandCode(result.getBrandCode())
+                .carLineCode(result.getCarLineCode())
+                .title(result.getTitle())
+                .version(result.getVersion())
+                .agreementDate(result.getAgreementDate())
+                .sanitizerVersion(result.getSanitizerVersion())
+                .lockVersion(result.getLockVersion())
+                .updatedBy(result.getUpdatedBy())
+                .updatedAt(result.getUpdatedAt())
+                .build();
+    }
+
+    /**
+     * 修订列表项转 VO
+     *
+     * @param result 列表项
+     * @return VO
+     */
+    public static AgreementRevisionSummaryResponse toVo(AgreementRevisionSummaryResult result) {
+        return AgreementRevisionSummaryResponse.builder()
+                .revisionId(result.getRevisionId())
+                .agreementCode(result.getAgreementCode())
+                .agreementType(result.getAgreementType())
+                .scene(result.getScene())
+                .market(result.getMarket())
+                .locale(result.getLocale())
+                .brandCode(result.getBrandCode())
+                .carLineCode(result.getCarLineCode())
+                .title(result.getTitle())
+                .version(result.getVersion())
+                .agreementDate(result.getAgreementDate())
+                .contentHash(result.getContentHash())
+                .sanitizerVersion(result.getSanitizerVersion())
+                .sourceDraftVersion(result.getSourceDraftVersion())
+                .frozenBy(result.getFrozenBy())
+                .frozenAt(result.getFrozenAt())
+                .build();
+    }
+
+    /**
+     * 发布包列表项转 VO
+     *
+     * @param result 列表项
+     * @return VO
+     */
+    public static AgreementBundleSummaryResponse toVo(AgreementBundleSummaryResult result) {
+        return AgreementBundleSummaryResponse.builder()
+                .bundleId(result.getBundleId())
+                .scene(result.getScene())
+                .market(result.getMarket())
+                .locale(result.getLocale())
+                .brandCode(result.getBrandCode())
+                .carLineCode(result.getCarLineCode())
+                .privacyRevisionId(result.getPrivacyRevisionId())
+                .userRevisionId(result.getUserRevisionId())
+                .publishedBy(result.getPublishedBy())
+                .publishedAt(result.getPublishedAt())
+                .requestId(result.getRequestId())
+                .build();
+    }
+
+    /**
+     * 元数据转 VO
+     *
+     * @param result 元数据
+     * @return VO
+     */
+    public static AgreementMetadataResponse toVo(AgreementMetadataResult result) {
+        return AgreementMetadataResponse.builder()
+                .agreementTypes(result.getAgreementTypes())
+                .scenes(result.getScenes())
+                .markets(result.getMarkets())
+                .locales(result.getLocales())
+                .brands(result.getBrands())
+                .carLines(result.getCarLines())
+                .carLinesByBrand(result.getCarLinesByBrand())
+                .contentType(result.getContentType())
+                .sanitizerVersion(result.getSanitizerVersion())
+                .maxInputBytes(result.getMaxInputBytes())
+                .maxOutputBytes(result.getMaxOutputBytes())
+                .build();
+    }
+
+    /**
+     * 当前发布包读取结果转管理侧 VO（含正文只读预览）
+     *
+     * @param result 读取结果
+     * @return VO
+     */
+    public static AgreementCurrentBundleResponse toCurrentBundleVo(AgreementBundleContentResult result) {
+        List<AgreementCurrentBundleResponse.AgreementItem> agreements = result.getAgreements().stream()
+                .map(AgreementWebAssembler::toCurrentBundleItem)
+                .collect(Collectors.toList());
+        return AgreementCurrentBundleResponse.builder()
+                .bundleId(result.getBundleId())
+                .scene(result.getScene())
+                .market(result.getMarket())
+                .locale(result.getLocale())
+                .brandCode(result.getBrandCode())
+                .carLineCode(result.getCarLineCode())
+                .publishedAt(result.getPublishedAt())
+                .agreements(agreements)
+                .build();
+    }
+
+    private static AgreementCurrentBundleResponse.AgreementItem toCurrentBundleItem(
+            AgreementBundleContentResult.AgreementContentResult result) {
+        return AgreementCurrentBundleResponse.AgreementItem.builder()
+                .agreementCode(result.getAgreementCode())
+                .agreementType(result.getAgreementType())
+                .revisionId(result.getRevisionId())
+                .version(result.getVersion())
+                .agreementDate(result.getAgreementDate())
+                .title(result.getTitle())
+                .scene(result.getScene())
+                .market(result.getMarket())
+                .locale(result.getLocale())
+                .brandCode(result.getBrandCode())
+                .carLineCode(result.getCarLineCode())
+                .contentType(result.getContentType())
+                .body(result.getBody())
+                .contentHash(result.getContentHash())
+                .sanitizerVersion(result.getSanitizerVersion())
                 .build();
     }
 

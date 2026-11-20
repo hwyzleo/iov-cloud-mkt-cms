@@ -6,7 +6,9 @@ import net.hwyz.iov.cloud.mkt.cms.service.application.assembler.AgreementAssembl
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.CreateAgreementDraftCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.FreezeAgreementDraftCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.UpdateAgreementDraftCmd;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.query.AgreementSearchQuery;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementDraftResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementDraftSummaryResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementRevisionResult;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.AgreementAction;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.AgreementType;
@@ -24,11 +26,13 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.AgreementDraftReposi
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.AgreementOperationRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.AgreementRevisionRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ScopeResolver;
+import net.hwyz.iov.cloud.framework.web.util.PageUtil;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 协议草稿应用服务（创建、修改、查询与定稿编排）。
@@ -105,6 +109,17 @@ public class AgreementDraftAppService {
                 TraceContext.currentTraceId()));
         log.info("协议草稿修改成功: draftId={}, lockVersion={}", edited.getDraftId(), edited.getLockVersion());
         return AgreementAssembler.toDraftResult(edited, sanitized != null && sanitized.isAdjusted());
+    }
+
+    /**
+     * 条件检索草稿（列表不含正文，分页在数据库阶段完成）
+     *
+     * @param query 检索条件
+     * @return 草稿列表项
+     */
+    public List<AgreementDraftSummaryResult> search(AgreementSearchQuery query) {
+        return PageUtil.convert(agreementDraftRepository.search(AgreementAssembler.toCriteria(query)),
+                AgreementAssembler::toDraftSummaryResult);
     }
 
     /**

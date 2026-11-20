@@ -148,4 +148,29 @@
           AND c.car_line_code = #{carLineCode}
     </select>
 
+    <!-- 历史发布包检索：按发布时间倒序 -->
+    <select id="selectPoByCriteria" resultMap="bundleResultMap">
+        SELECT id, bundle_id, scene, market, locale, brand_code, car_line_code, privacy_revision_id,
+               user_revision_id, published_by, published_at, request_id, request_hash, expected_bundle_id
+        FROM cms_agreement_bundle
+        <where>
+            <if test="criteria.scene != null and criteria.scene != ''">
+                AND scene = #{criteria.scene}
+            </if>
+            <if test="criteria.market != null and criteria.market != ''">
+                AND market = #{criteria.market}
+            </if>
+            <if test="criteria.locale != null and criteria.locale != ''">
+                AND locale = #{criteria.locale}
+            </if>
+            <if test="criteria.brandCode != null and criteria.brandCode != ''">
+                AND brand_code = #{criteria.brandCode}
+            </if>
+            <if test="criteria.carLineCode != null and criteria.carLineCode != ''">
+                AND car_line_code = #{criteria.carLineCode}
+            </if>
+        </where>
+        ORDER BY published_at DESC, id DESC
+    </select>
+
 </mapper>

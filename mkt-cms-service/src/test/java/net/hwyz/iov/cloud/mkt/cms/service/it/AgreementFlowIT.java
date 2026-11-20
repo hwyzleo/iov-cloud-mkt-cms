@@ -9,7 +9,13 @@ import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.CreateAgreementDra
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.FreezeAgreementDraftCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.PublishAgreementBundleCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.UpdateAgreementDraftCmd;
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.query.AgreementScopeQuery;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.query.AgreementSearchQuery;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleSummaryResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementDraftSummaryResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementRevisionSummaryResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleContentResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementDraftResult;
@@ -385,6 +391,66 @@ class AgreementFlowIT {
                         + "AND result = 'SUCCESS' AND object_id IS NOT NULL", Integer.class));
     }
 
+    @Test
+    @DisplayName("管理检索：草稿/修订/发布包分页与内容语言过滤（列表不含正文）")
+    void 管理检索与语言过滤() {
+        AgreementDraftResult zhDraft = agreementDraftAppService.create(
+                createCmd("PRIVACY_POLICY", "<p>中文隐私</p>", null, null));
+        agreementDraftAppService.create(
+                createCmd("PRIVACY_POLICY", "<p>English privacy</p>", null, "en-US"));
+        AgreementDraftResult zhUserDraft = agreementDraftAppService.create(
+                createCmd("USER_AGREEMENT", "<p>中文用户协议</p>", null, null));
+        AgreementRevisionResult zhPrivacy = freeze(zhDraft.getDraftId(), zhDraft.getLockVersion());
+        AgreementRevisionResult zhUser = freeze(zhUserDraft.getDraftId(), zhUserDraft.getLockVersion());
+        publish("req-list-1", zhPrivacy.getRevisionId(), zhUser.getRevisionId(), null);
+
+        try {
+            PageHelper.startPage(1, 10);
+            List<AgreementDraftSummaryResult> zhDrafts = agreementDraftAppService.search(
+                    AgreementSearchQuery.builder().locale("zh-CN").build());
+            assertEquals(2, zhDrafts.size());
+            assertTrue(((Page<?>) zhDrafts).getTotal() >= 2);
+            assertTrue(zhDrafts.stream().allMatch(draft -> "zh-CN".equals(draft.getLocale())));
+
+            PageHelper.startPage(1, 1);
+            List<AgreementDraftSummaryResult> firstPage = agreementDraftAppService.search(
+                    AgreementSearchQuery.builder().locale("zh-CN").build());
+            assertEquals(1, firstPage.size());
+            assertTrue(((Page<?>) firstPage).getTotal() >= 2);
+
+            PageHelper.startPage(1, 10);
+            List<AgreementDraftSummaryResult> enDrafts = agreementDraftAppService.search(
+                    AgreementSearchQuery.builder().locale("en-US").build());
+            assertEquals(1, enDrafts.size());
+            assertEquals("PRIVACY_POLICY", enDrafts.get(0).getAgreementType());
+            assertEquals("en-US", enDrafts.get(0).getLocale());
+
+            PageHelper.startPage(1, 10);
+            List<AgreementDraftSummaryResult> byTitle = agreementDraftAppService.search(
+                    AgreementSearchQuery.builder().title("PRIVACY_POLICY").build());
+            assertEquals(2, byTitle.size());
+
+            PageHelper.startPage(1, 10);
+            List<AgreementRevisionSummaryResult> publishedRevisions = agreementContentAppService
+                    .searchRevisions(AgreementSearchQuery.builder().locale("zh-CN").published(true).build());
+            assertEquals(2, publishedRevisions.size());
+            assertTrue(publishedRevisions.stream().allMatch(r -> r.getContentHash().startsWith("sha256:")));
+
+            PageHelper.startPage(1, 10);
+            List<AgreementRevisionSummaryResult> enRevisions = agreementContentAppService
+                    .searchRevisions(AgreementSearchQuery.builder().locale("en-US").build());
+            assertTrue(enRevisions.isEmpty(), "en-US 尚未定稿，不应出现在修订列表");
+
+            PageHelper.startPage(1, 10);
+            List<AgreementBundleSummaryResult> bundles = agreementContentAppService.searchBundles(
+                    AgreementSearchQuery.builder().scene("IVI_ACTIVATION").locale("zh-CN").build());
+            assertEquals(1, bundles.size());
+            assertEquals("zh-CN", bundles.get(0).getLocale());
+        } finally {
+            PageHelper.clearPage();
+        }
+    }
+
     // ==================== 辅助方法 ====================
 
     private CreateAgreementDraftCmd createCmd(String type, String body, String market, String locale) {
@@ -523,7 +589,8 @@ class AgreementFlowIT {
             TransactionAutoConfiguration.class,
             MybatisPlusAutoConfiguration.class,
             MybatisPlusLanguageDriverAutoConfiguration.class,
-            FlywayAutoConfiguration.class
+            FlywayAutoConfiguration.class,
+            com.github.pagehelper.autoconfigure.PageHelperAutoConfiguration.class
     })
     @ComponentScan(basePackages = "net.hwyz.iov.cloud.mkt.cms.service",
             excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = CmsApplication.class))

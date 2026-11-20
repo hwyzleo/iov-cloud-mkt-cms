@@ -6,9 +6,11 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.port.SupportedScopeProvider;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -75,6 +77,13 @@ public class SupportedScopeProperties implements SupportedScopeProvider {
     @Override
     public boolean isCarLineOwnedByBrand(String brandCode, String carLineCode) {
         return ownership().getOrDefault(brandCode, Collections.emptySet()).contains(carLineCode);
+    }
+
+    @Override
+    public Map<String, List<String>> carLinesByBrand() {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        ownership().forEach((brand, carLines) -> result.put(brand, new ArrayList<>(carLines)));
+        return result;
     }
 
     private Map<String, Set<String>> ownership() {

@@ -148,6 +148,8 @@ class MptAgreementDraftControllerTest {
         assertPermission("get", org.springframework.web.bind.annotation.GetMapping.class,
                 "mkt:cms:agreement:query");
         assertPermission("freeze", PostMapping.class, "mkt:cms:agreement:freeze");
+        assertPermission("list", org.springframework.web.bind.annotation.GetMapping.class,
+                "mkt:cms:agreement:query");
 
         for (Method method : MptAgreementDraftController.class.getDeclaredMethods()) {
             if (method.getAnnotation(PostMapping.class) == null
@@ -185,6 +187,9 @@ class MptAgreementDraftControllerTest {
             case "freeze":
                 return new Class<?>[]{String.class, net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request
                         .FreezeAgreementDraftRequest.class};
+            case "list":
+                return new Class<?>[]{String.class, String.class, String.class, String.class, String.class,
+                        String.class, String.class, String.class};
             default:
                 throw new IllegalArgumentException("未知方法: " + methodName);
         }

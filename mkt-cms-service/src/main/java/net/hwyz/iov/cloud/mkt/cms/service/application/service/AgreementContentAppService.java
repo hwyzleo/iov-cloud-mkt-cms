@@ -3,8 +3,11 @@ package net.hwyz.iov.cloud.mkt.cms.service.application.service;
 import lombok.RequiredArgsConstructor;
 import net.hwyz.iov.cloud.mkt.cms.service.application.assembler.AgreementAssembler;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.query.AgreementScopeQuery;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.query.AgreementSearchQuery;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleContentResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementBundleSummaryResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementRevisionResult;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.AgreementRevisionSummaryResult;
 import net.hwyz.iov.cloud.mkt.cms.service.common.exception.AgreementErrorCode;
 import net.hwyz.iov.cloud.mkt.cms.service.common.exception.AgreementException;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementRevision;
@@ -13,7 +16,10 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.model.CurrentBundleView;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.AgreementBundleRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.AgreementRevisionRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ScopeResolver;
+import net.hwyz.iov.cloud.framework.web.util.PageUtil;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * 协议内容读取应用服务（内部业务读取 + 管理侧修订查看）。
@@ -72,6 +78,28 @@ public class AgreementContentAppService {
                 .orElseThrow(() -> new AgreementException(AgreementErrorCode.AGREEMENT_REVISION_NOT_FOUND,
                         "修订不存在: " + revisionId));
         return AgreementAssembler.toRevisionResult(revision);
+    }
+
+    /**
+     * 条件检索修订（列表不含正文；published=true 时仅返回已通过发布包发布的修订）
+     *
+     * @param query 检索条件
+     * @return 修订列表项
+     */
+    public List<AgreementRevisionSummaryResult> searchRevisions(AgreementSearchQuery query) {
+        return PageUtil.convert(agreementRevisionRepository.search(AgreementAssembler.toCriteria(query)),
+                AgreementAssembler::toRevisionSummaryResult);
+    }
+
+    /**
+     * 条件检索历史发布包
+     *
+     * @param query 检索条件
+     * @return 发布包列表项
+     */
+    public List<AgreementBundleSummaryResult> searchBundles(AgreementSearchQuery query) {
+        return PageUtil.convert(agreementBundleRepository.search(AgreementAssembler.toCriteria(query)),
+                AgreementAssembler::toBundleSummaryResult);
     }
 
     private void requireRevisionId(String revisionId) {

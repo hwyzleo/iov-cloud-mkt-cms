@@ -1,5 +1,8 @@
 package net.hwyz.iov.cloud.mkt.cms.service.domain.port;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -48,4 +51,13 @@ public interface SupportedScopeProvider {
      * @return 归属合法返回 true
      */
     boolean isCarLineOwnedByBrand(String brandCode, String carLineCode);
+
+    /**
+     * 品牌 → 车系归属清单（供管理端渲染级联选择，扩展品牌/车系无需改前端）
+     *
+     * @return 品牌到车系列表的映射；未配置时为空映射
+     */
+    default Map<String, List<String>> carLinesByBrand() {
+        return Collections.emptyMap();
+    }
 }

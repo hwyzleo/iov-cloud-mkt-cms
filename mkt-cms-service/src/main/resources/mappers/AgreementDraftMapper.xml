@@ -68,4 +68,39 @@
         WHERE draft_id = #{draftId}
     </select>
 
+    <!-- 列表检索：不返回正文，分页由 PageHelper 在数据库阶段介入 -->
+    <select id="selectPoByCriteria" resultMap="draftResultMap">
+        SELECT id, draft_id, agreement_type, scene, market, locale, brand_code, car_line_code, title, version,
+               agreement_date, content_type, sanitizer_version, lock_version, create_by, create_time,
+               modify_by, modify_time
+        FROM cms_agreement_draft
+        <where>
+            <if test="criteria.agreementType != null and criteria.agreementType != ''">
+                AND agreement_type = #{criteria.agreementType}
+            </if>
+            <if test="criteria.scene != null and criteria.scene != ''">
+                AND scene = #{criteria.scene}
+            </if>
+            <if test="criteria.market != null and criteria.market != ''">
+                AND market = #{criteria.market}
+            </if>
+            <if test="criteria.locale != null and criteria.locale != ''">
+                AND locale = #{criteria.locale}
+            </if>
+            <if test="criteria.brandCode != null and criteria.brandCode != ''">
+                AND brand_code = #{criteria.brandCode}
+            </if>
+            <if test="criteria.carLineCode != null and criteria.carLineCode != ''">
+                AND car_line_code = #{criteria.carLineCode}
+            </if>
+            <if test="criteria.title != null and criteria.title != ''">
+                AND title LIKE CONCAT('%', #{criteria.title}, '%')
+            </if>
+            <if test="criteria.version != null and criteria.version != ''">
+                AND version = #{criteria.version}
+            </if>
+        </where>
+        ORDER BY modify_time DESC, id DESC
+    </select>
+
 </mapper>

@@ -1,8 +1,11 @@
 package net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper;
 
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.AgreementRevisionPo;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementSearchCriteria;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * 协议修订 Mapper（只增只读，不提供更新与删除语句）。
@@ -45,4 +48,12 @@ public interface AgreementRevisionMapper {
      * @return 修订
      */
     AgreementRevisionPo selectPublishedByRevisionId(@Param("revisionId") String revisionId);
+
+    /**
+     * 条件检索修订（不返回正文）
+     *
+     * @param criteria 检索条件
+     * @return 修订列表
+     */
+    List<AgreementRevisionPo> selectPoByCriteria(@Param("criteria") AgreementSearchCriteria criteria);
 }

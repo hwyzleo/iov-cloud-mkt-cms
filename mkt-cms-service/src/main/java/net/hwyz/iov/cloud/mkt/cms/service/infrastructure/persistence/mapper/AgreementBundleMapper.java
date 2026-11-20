@@ -1,9 +1,12 @@
 package net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper;
 
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.AgreementBundlePo;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementSearchCriteria;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.CurrentBundleViewPo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * 协议发布包 Mapper。
@@ -55,6 +58,14 @@ public interface AgreementBundleMapper {
      * @param carLineCode 车系
      * @return 当前发布包视图
      */
+    /**
+     * 条件检索历史发布包
+     *
+     * @param criteria 检索条件
+     * @return 发布包列表
+     */
+    List<AgreementBundlePo> selectPoByCriteria(@Param("criteria") AgreementSearchCriteria criteria);
+
     CurrentBundleViewPo selectCurrentView(@Param("scene") String scene,
                                           @Param("market") String market,
                                           @Param("locale") String locale,

@@ -1,7 +1,9 @@
 package net.hwyz.iov.cloud.mkt.cms.service.domain.repository;
 
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementRevision;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementSearchCriteria;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -45,4 +47,12 @@ public interface AgreementRevisionRepository {
      * @return 修订
      */
     Optional<AgreementRevision> findPublishedByRevisionId(String revisionId);
+
+    /**
+     * 条件检索修订（列表不返回正文）
+     *
+     * @param criteria 检索条件
+     * @return 修订列表（不含正文）
+     */
+    List<AgreementRevision> search(AgreementSearchCriteria criteria);
 }

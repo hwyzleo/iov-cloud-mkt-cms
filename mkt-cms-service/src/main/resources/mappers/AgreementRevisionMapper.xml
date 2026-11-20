@@ -72,4 +72,46 @@
           )
     </select>
 
+    <!-- 列表检索：不返回正文；published=true 时仅返回被发布包引用的修订 -->
+    <select id="selectPoByCriteria" resultMap="revisionResultMap">
+        SELECT id, revision_id, agreement_code, agreement_type, scene, market, locale, brand_code, car_line_code,
+               title, version, agreement_date, content_type, content_hash, sanitizer_version,
+               source_draft_id, source_draft_version, frozen_by, frozen_at
+        FROM cms_agreement_revision r
+        <where>
+            <if test="criteria.agreementType != null and criteria.agreementType != ''">
+                AND r.agreement_type = #{criteria.agreementType}
+            </if>
+            <if test="criteria.scene != null and criteria.scene != ''">
+                AND r.scene = #{criteria.scene}
+            </if>
+            <if test="criteria.market != null and criteria.market != ''">
+                AND r.market = #{criteria.market}
+            </if>
+            <if test="criteria.locale != null and criteria.locale != ''">
+                AND r.locale = #{criteria.locale}
+            </if>
+            <if test="criteria.brandCode != null and criteria.brandCode != ''">
+                AND r.brand_code = #{criteria.brandCode}
+            </if>
+            <if test="criteria.carLineCode != null and criteria.carLineCode != ''">
+                AND r.car_line_code = #{criteria.carLineCode}
+            </if>
+            <if test="criteria.title != null and criteria.title != ''">
+                AND r.title LIKE CONCAT('%', #{criteria.title}, '%')
+            </if>
+            <if test="criteria.version != null and criteria.version != ''">
+                AND r.version = #{criteria.version}
+            </if>
+            <if test="criteria.published != null and criteria.published">
+                AND EXISTS (
+                    SELECT 1 FROM cms_agreement_bundle b
+                    WHERE b.privacy_revision_id = r.revision_id
+                       OR b.user_revision_id = r.revision_id
+                )
+            </if>
+        </where>
+        ORDER BY r.frozen_at DESC, r.id DESC
+    </select>
+
 </mapper>

@@ -4,16 +4,20 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.hwyz.iov.cloud.framework.common.bean.ApiResponse;
+import net.hwyz.iov.cloud.framework.common.bean.PageResult;
 import net.hwyz.iov.cloud.framework.security.annotation.RequiresPermissions;
 import net.hwyz.iov.cloud.framework.web.controller.BaseController;
+import net.hwyz.iov.cloud.framework.web.util.PageUtil;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.assembler.AgreementWebAssembler;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.support.OperatorResolver;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.CreateAgreementDraftRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.FreezeAgreementDraftRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.UpdateAgreementDraftRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementDraftResponse;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementDraftSummaryResponse;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.response.AgreementRevisionResponse;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.FreezeAgreementDraftCmd;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.query.AgreementSearchQuery;
 import net.hwyz.iov.cloud.mkt.cms.service.application.service.AgreementDraftAppService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,7 +25,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 协议草稿管理（MPT 管理后台）。
@@ -38,6 +45,46 @@ import org.springframework.web.bind.annotation.RestController;
 public class MptAgreementDraftController extends BaseController {
 
     private final AgreementDraftAppService agreementDraftAppService;
+
+    /**
+     * 分页检索草稿（列表不含正文；按类型、范围、内容语言、标题与版本过滤）
+     *
+     * @param agreementType 协议类型
+     * @param scene         场景
+     * @param market        市场
+     * @param locale        内容语言
+     * @param brandCode     品牌
+     * @param carLineCode   车系
+     * @param title         标题（模糊）
+     * @param version       业务版本（精确）
+     * @return 草稿分页列表
+     */
+    @RequiresPermissions("mkt:cms:agreement:query")
+    @GetMapping("/list")
+    public ApiResponse<PageResult<AgreementDraftSummaryResponse>> list(
+            @RequestParam(value = "agreementType", required = false) String agreementType,
+            @RequestParam(value = "scene", required = false) String scene,
+            @RequestParam(value = "market", required = false) String market,
+            @RequestParam(value = "locale", required = false) String locale,
+            @RequestParam(value = "brandCode", required = false) String brandCode,
+            @RequestParam(value = "carLineCode", required = false) String carLineCode,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "version", required = false) String version) {
+        startPage();
+        List<AgreementDraftSummaryResponse> list = PageUtil.convert(
+                agreementDraftAppService.search(AgreementSearchQuery.builder()
+                        .agreementType(agreementType)
+                        .scene(scene)
+                        .market(market)
+                        .locale(locale)
+                        .brandCode(brandCode)
+                        .carLineCode(carLineCode)
+                        .title(title)
+                        .version(version)
+                        .build()),
+                AgreementWebAssembler::toVo);
+        return ApiResponse.ok(getPageResult(list));
+    }
 
     /**
      * 新建草稿

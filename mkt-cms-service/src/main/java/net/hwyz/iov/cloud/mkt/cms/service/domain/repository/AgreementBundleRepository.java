@@ -2,8 +2,10 @@ package net.hwyz.iov.cloud.mkt.cms.service.domain.repository;
 
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementBundle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementScope;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.AgreementSearchCriteria;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.CurrentBundleView;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -52,4 +54,12 @@ public interface AgreementBundleRepository {
      * @return 当前发布包视图
      */
     Optional<CurrentBundleView> findCurrentView(AgreementScope scope);
+
+    /**
+     * 条件检索历史发布包
+     *
+     * @param criteria 检索条件
+     * @return 发布包列表
+     */
+    List<AgreementBundle> search(AgreementSearchCriteria criteria);
 }
