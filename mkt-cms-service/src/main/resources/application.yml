@@ -34,10 +34,8 @@ cms:
       car-lines: ${CMS_AGREEMENT_SUPPORTED_CAR_LINES:DEFAULT}
       # 品牌 → 车系归属（BRAND:CAR_LINE，逗号分隔）；DEFAULT 品牌只允许 DEFAULT 车系
       brand-car-lines: ${CMS_AGREEMENT_SUPPORTED_BRAND_CAR_LINES:}
-
-# 探索页子域配置（MKT-CMS-DSN-CR-003）
-# 白名单默认空 = 不允许任何外链（安全默认），部署环境必须显式配置素材/ H5 / NATIVE 白名单。
-cms:
+  # 探索页子域配置（MKT-CMS-DSN-CR-003）
+  # 白名单默认空 = 不允许任何外链（安全默认），部署环境必须显式配置素材/ H5 / NATIVE 白名单。
   explore:
     allowed-asset-hosts: ${CMS_EXPLORE_ALLOWED_ASSET_HOSTS:}
     allowed-h5-origins: ${CMS_EXPLORE_ALLOWED_H5_ORIGINS:}
