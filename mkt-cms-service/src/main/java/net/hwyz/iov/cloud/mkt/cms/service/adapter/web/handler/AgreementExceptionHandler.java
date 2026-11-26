@@ -6,6 +6,8 @@ import net.hwyz.iov.cloud.framework.common.bean.ApiResponse;
 import net.hwyz.iov.cloud.framework.common.exception.ErrorCode;
 import net.hwyz.iov.cloud.mkt.cms.service.common.exception.AgreementErrorCode;
 import net.hwyz.iov.cloud.mkt.cms.service.common.exception.AgreementException;
+import net.hwyz.iov.cloud.mkt.cms.service.common.exception.ExploreErrorCode;
+import net.hwyz.iov.cloud.mkt.cms.service.common.exception.ExploreException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
@@ -24,6 +28,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  * MKT-CMS-DSN-CR-001 §7（D-005）：参数错误 400、无当前包/修订或草稿不存在 404、
  * 版本/发布/幂等冲突 409、数据源暂不可用 503；响应体仍是平台统一错误包装（含 traceId），
  * 不返回草稿、成功空包或部分协议正文。
+ * <p>
+ * MKT-CMS-DSN-CR-003 §6.3：探索页子域复用同一异常治理（105009～105017），
+ * 参数校验错误按请求路径选择所属子域错误码，避免错误码串域。
  *
  * @author hwyz_leo
  */
@@ -31,6 +38,23 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
 public class AgreementExceptionHandler {
+
+    /**
+     * 探索页子域业务异常
+     *
+     * @param exception 业务异常
+     * @param response  HTTP 响应（写入 no-store，避免错误被缓存）
+     * @return 统一错误包装
+     */
+    @ExceptionHandler(ExploreException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExploreException(ExploreException exception,
+                                                                   HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        ErrorCode errorCode = exception.getErrorCode();
+        log.warn("探索页子域业务异常: code={}, message={}", errorCode.getCode(), exception.getMessage());
+        return ResponseEntity.status(statusOfExplore(errorCode))
+                .body(ApiResponse.fail(errorCode, exception.getMessage()));
+    }
 
     /**
      * 协议子域业务异常
@@ -99,9 +123,40 @@ public class AgreementExceptionHandler {
     }
 
     private ResponseEntity<ApiResponse<Void>> badRequest(String detail) {
-        log.warn("协议请求参数错误: {}", detail);
+        log.warn("CMS 请求参数错误: {}", detail);
+        ErrorCode errorCode = isExploreRequest()
+                ? ExploreErrorCode.EXPLORE_INVALID_ARGUMENT
+                : AgreementErrorCode.AGREEMENT_INVALID_ARGUMENT;
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.fail(AgreementErrorCode.AGREEMENT_INVALID_ARGUMENT, detail));
+                .body(ApiResponse.fail(errorCode, detail));
+    }
+
+    private boolean isExploreRequest() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+            String uri = attributes.getRequest().getRequestURI();
+            return uri != null && (uri.startsWith("/api/mpt/explore")
+                    || uri.startsWith("/api/mobile/explore"));
+        }
+        return false;
+    }
+
+    private HttpStatus statusOfExplore(ErrorCode errorCode) {
+        String code = errorCode.getCode();
+        if (ExploreErrorCode.EXPLORE_CONTENT_NOT_FOUND.getCode().equals(code)
+                || ExploreErrorCode.EXPLORE_PAGE_NOT_FOUND.getCode().equals(code)) {
+            return HttpStatus.NOT_FOUND;
+        }
+        if (ExploreErrorCode.EXPLORE_VERSION_CONFLICT.getCode().equals(code)
+                || ExploreErrorCode.EXPLORE_PUBLISH_CONFLICT.getCode().equals(code)
+                || ExploreErrorCode.EXPLORE_IDEMPOTENCY_CONFLICT.getCode().equals(code)
+                || ExploreErrorCode.EXPLORE_SCHEDULE_CONFLICT.getCode().equals(code)
+                || ExploreErrorCode.EXPLORE_RELEASE_CHANGED.getCode().equals(code)) {
+            return HttpStatus.CONFLICT;
+        }
+        if (ExploreErrorCode.EXPLORE_TEMPORARILY_UNAVAILABLE.getCode().equals(code)) {
+            return HttpStatus.SERVICE_UNAVAILABLE;
+        }
+        return HttpStatus.BAD_REQUEST;
     }
 
     private HttpStatus statusOf(ErrorCode errorCode) {

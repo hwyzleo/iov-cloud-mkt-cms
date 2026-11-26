@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExplorePageCurrentMapper">
+
+    <!-- 时间列统一使用 UTC 墙钟（DATETIME(3)），显式 UTC 类型处理器 -->
+    <resultMap id="currentResultMap" type="net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExplorePageCurrentPo">
+        <result column="channel_code" property="channelCode"/>
+        <result column="release_id" property="releaseId"/>
+        <result column="lock_version" property="lockVersion"/>
+        <result column="updated_at" property="updatedAt"
+                typeHandler="net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="currentResultMap">
+        SELECT channel_code, release_id, lock_version, updated_at
+        FROM cms_explore_page_current
+    </select>
+
+    <select id="selectByChannel" resultMap="currentResultMap">
+        SELECT channel_code, release_id, lock_version, updated_at
+        FROM cms_explore_page_current
+        WHERE channel_code = #{channelCode}
+    </select>
+
+    <!-- 发布/下线/调度路径统一先锁频道指针行，锁顺序一致 -->
+    <select id="selectByChannelForUpdate" resultMap="currentResultMap">
+        SELECT channel_code, release_id, lock_version, updated_at
+        FROM cms_explore_page_current
+        WHERE channel_code = #{channelCode}
+        FOR UPDATE
+    </select>
+
+    <insert id="insertEmpty">
+        INSERT INTO cms_explore_page_current (channel_code, release_id, lock_version, updated_at)
+        VALUES (#{channelCode}, NULL, 0,
+                #{now,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler})
+    </insert>
+
+    <update id="switchPointer">
+        UPDATE cms_explore_page_current
+        SET release_id = #{releaseId},
+            lock_version = lock_version + 1,
+            updated_at = #{now,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler}
+        WHERE channel_code = #{channelCode}
+          AND lock_version = #{expectedLockVersion}
+    </update>
+
+    <update id="clearPointer">
+        UPDATE cms_explore_page_current
+        SET release_id = NULL,
+            lock_version = lock_version + 1,
+            updated_at = #{now,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler}
+        WHERE channel_code = #{channelCode}
+          AND lock_version = #{expectedLockVersion}
+    </update>
+
+    <!-- 调度激活：按 releaseId 比较后切换，重复执行不会重复切换 -->
+    <update id="activate">
+        UPDATE cms_explore_page_current
+        SET release_id = #{newReleaseId},
+            lock_version = lock_version + 1,
+            updated_at = #{now,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler}
+        WHERE channel_code = #{channelCode}
+          <choose>
+              <when test="expectedReleaseId != null">
+                  AND release_id = #{expectedReleaseId}
+              </when>
+              <otherwise>
+                  AND release_id IS NULL
+              </otherwise>
+          </choose>
+    </update>
+
+    <!-- 调度到期：清空指针，不回退旧版本 -->
+    <update id="expire">
+        UPDATE cms_explore_page_current
+        SET release_id = NULL,
+            lock_version = lock_version + 1,
+            updated_at = #{now,jdbcType=TIMESTAMP,typeHandler=net.hwyz.iov.cloud.framework.mysql.typehandler.UtcInstantTypeHandler}
+        WHERE channel_code = #{channelCode}
+          <choose>
+              <when test="expectedReleaseId != null">
+                  AND release_id = #{expectedReleaseId}
+              </when>
+              <otherwise>
+                  AND release_id IS NULL
+              </otherwise>
+          </choose>
+    </update>
+
+</mapper>
