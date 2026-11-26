@@ -35,9 +35,10 @@ cms:
       # 品牌 → 车系归属（BRAND:CAR_LINE，逗号分隔）；DEFAULT 品牌只允许 DEFAULT 车系
       brand-car-lines: ${CMS_AGREEMENT_SUPPORTED_BRAND_CAR_LINES:}
   # 探索页子域配置（MKT-CMS-DSN-CR-003）
-  # 白名单默认空 = 不允许任何外链（安全默认），部署环境必须显式配置素材/ H5 / NATIVE 白名单。
+  # 素材白名单默认仅允许平台 EDD-OSS 的 COS 域名；部署环境可用 CMS_EXPLORE_ALLOWED_ASSET_HOSTS 覆盖或追加。
+  # H5 / NATIVE 白名单默认仍为空 = 不允许任何外链（安全默认），由部署环境显式配置。
   explore:
-    allowed-asset-hosts: ${CMS_EXPLORE_ALLOWED_ASSET_HOSTS:}
+    allowed-asset-hosts: ${CMS_EXPLORE_ALLOWED_ASSET_HOSTS:openiov-1471221926.cos.ap-guangzhou.myqcloud.com}
     allowed-h5-origins: ${CMS_EXPLORE_ALLOWED_H5_ORIGINS:}
     native-route-codes: ${CMS_EXPLORE_NATIVE_ROUTE_CODES:}
     native-param-keys: ${CMS_EXPLORE_NATIVE_PARAM_KEYS:}
