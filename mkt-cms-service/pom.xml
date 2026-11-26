@@ -18,6 +18,7 @@
         <cms.version>0.0.1-SNAPSHOT</cms.version>
         <!-- Parent BOM 未代管 jsoup 版本，本模块显式锁定（MKT-CMS-DSN-CR-001 §3.1.1） -->
         <jsoup.version>1.19.1</jsoup.version>
+        <oss.version>0.0.1-SNAPSHOT</oss.version>
     </properties>
 
     <dependencies>
@@ -43,6 +44,13 @@
         <dependency>
             <groupId>net.hwyz.iov.cloud.framework</groupId>
             <artifactId>framework-audit-starter</artifactId>
+        </dependency>
+
+        <!-- 对象存储契约（MKT-CMS-DSN-CR-003：探索页素材由 CMS 调用 EDD-OSS 直传） -->
+        <dependency>
+            <groupId>net.hwyz.iov.cloud.edd</groupId>
+            <artifactId>edd-oss-api</artifactId>
+            <version>${oss.version}</version>
         </dependency>
 
         <!-- 数据库迁移：Flyway -->

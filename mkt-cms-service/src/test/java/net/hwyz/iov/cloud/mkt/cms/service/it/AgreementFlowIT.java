@@ -1,5 +1,6 @@
 package net.hwyz.iov.cloud.mkt.cms.service.it;
 
+import net.hwyz.iov.cloud.edd.oss.api.service.ImageService;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusLanguageDriverAutoConfiguration;
 import net.hwyz.iov.cloud.framework.mysql.config.MyBatisMetaObjectHandler;
@@ -39,6 +40,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerA
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
@@ -116,6 +118,9 @@ class AgreementFlowIT {
     private AgreementPublishAppService agreementPublishAppService;
     @Autowired
     private AgreementContentAppService agreementContentAppService;
+    @MockBean
+    private ImageService imageService;
+
     @Autowired
     private DataSource dataSource;
     @Autowired
