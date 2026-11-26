@@ -75,6 +75,7 @@ public class MobileExploreController {
      * 文章信息流翻页（同一发布版本 keyset 物理分页）
      *
      * @param channelCode 频道编码
+     * @param componentId 首页返回的文章流组件标识
      * @param releaseId   首页返回的发布版本
      * @param cursor      不透明游标
      * @param pageSize    页大小
@@ -83,10 +84,12 @@ public class MobileExploreController {
     @GetMapping("/article-feed")
     public ApiResponse<Map<String, Object>> articleFeed(
             @RequestParam("channelCode") String channelCode,
+            @RequestParam("componentId") String componentId,
             @RequestParam("releaseId") String releaseId,
             @RequestParam(value = "cursor", required = false) String cursor,
             @RequestParam(value = "pageSize", required = false) Integer pageSize) {
-        return ApiResponse.ok(mobileQueryAppService.articleFeed(channelCode, releaseId, cursor, pageSize));
+        return ApiResponse.ok(mobileQueryAppService.articleFeed(
+                channelCode, componentId, releaseId, cursor, pageSize));
     }
 
     /**

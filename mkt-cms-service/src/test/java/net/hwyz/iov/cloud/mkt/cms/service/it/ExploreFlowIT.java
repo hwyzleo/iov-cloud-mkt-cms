@@ -291,7 +291,7 @@ class ExploreFlowIT {
         assertNotNull(feed.getNextCursor());
 
         Map<String, Object> next = mobileQueryAppService.articleFeed(CHANNEL,
-                page.getReleaseId(), feed.getNextCursor(), 2);
+                feed.getComponentId(), page.getReleaseId(), feed.getNextCursor(), 2);
         assertEquals(1, ((List<?>) next.get("items")).size());
         assertEquals(false, next.get("hasMore"));
 
@@ -306,7 +306,8 @@ class ExploreFlowIT {
         assertEquals("专题一", topicDetail.get("name"));
 
         ExploreException changed = assertThrows(ExploreException.class,
-                () -> mobileQueryAppService.articleFeed(CHANNEL, "er_missing", null, 10));
+                () -> mobileQueryAppService.articleFeed(CHANNEL, feed.getComponentId(),
+                        "er_missing", null, 10));
         assertEquals(ExploreErrorCode.EXPLORE_RELEASE_CHANGED, changed.getErrorCode());
     }
 
@@ -492,9 +493,11 @@ class ExploreFlowIT {
     }
 
     @Test
-    @DisplayName("同类组件可多次添加，专题样式与组件标题生效")
+    @DisplayName("同类组件可多次添加，专题样式及多文章流独立翻页生效")
     void 同类组件多次与专题样式() {
         ExploreArticleView article = publishedArticle("多组件文章", "<p>正文</p>");
+        ExploreArticleView secondFeedArticleOne = publishedArticle("第二文章流一", "<p>正文一</p>");
+        ExploreArticleView secondFeedArticleTwo = publishedArticle("第二文章流二", "<p>正文二</p>");
         ExploreTopicView topic = publishedTopic("多组件专题", article);
 
         ExplorePageSaveCmd.Component topicScroll = ExplorePageSaveCmd.Component.builder()
@@ -522,13 +525,16 @@ class ExploreFlowIT {
                 .type(ExploreComponentType.ARTICLE_FEED.name())
                 .sortNo(40)
                 .config(Map.of("title", "更多内容"))
-                .items(List.of(item(ExploreItemType.ARTICLE, article.getArticle().getArticleId(),
-                        article.getRevision().getRevisionId(), 10)))
+                .items(List.of(
+                        item(ExploreItemType.ARTICLE, secondFeedArticleOne.getArticle().getArticleId(),
+                                secondFeedArticleOne.getRevision().getRevisionId(), 10),
+                        item(ExploreItemType.ARTICLE, secondFeedArticleTwo.getArticle().getArticleId(),
+                                secondFeedArticleTwo.getRevision().getRevisionId(), 20)))
                 .build();
         savePage(0, List.of(topicScroll, topicText, feedOne, feedTwo));
         publishPage("req-multi-components", null, "IMMEDIATE", null, null);
 
-        ExplorePageView page = mobileQueryAppService.currentPage(CHANNEL, 10);
+        ExplorePageView page = mobileQueryAppService.currentPage(CHANNEL, 1);
         assertEquals(4, page.getComponents().size());
         List<ExploreComponentView> topics = page.getComponents().stream()
                 .filter(component -> "TOPIC_GRID".equals(component.getType())).toList();
@@ -536,8 +542,23 @@ class ExploreFlowIT {
         assertEquals("HORIZONTAL_SCROLL", topics.get(0).getConfig().get("style"));
         assertEquals("横滑专题", topics.get(0).getConfig().get("title"));
         assertEquals("IMAGE_TEXT_LIST", topics.get(1).getConfig().get("style"));
-        assertEquals(2, page.getComponents().stream()
-                .filter(component -> "ARTICLE_FEED".equals(component.getType())).count());
+        List<ExploreComponentView> feeds = page.getComponents().stream()
+                .filter(component -> "ARTICLE_FEED".equals(component.getType())).toList();
+        assertEquals(2, feeds.size());
+        ExploreComponentView secondFeed = feeds.get(1);
+        assertTrue(secondFeed.isHasMore());
+        assertNotNull(secondFeed.getNextCursor());
+
+        Map<String, Object> secondFeedNextPage = mobileQueryAppService.articleFeed(CHANNEL,
+                secondFeed.getComponentId(), page.getReleaseId(), secondFeed.getNextCursor(), 1);
+        assertEquals(secondFeed.getComponentId(), secondFeedNextPage.get("componentId"));
+        assertEquals(1, ((List<?>) secondFeedNextPage.get("items")).size());
+        assertFalse((Boolean) secondFeedNextPage.get("hasMore"));
+
+        ExploreException invalidComponent = assertThrows(ExploreException.class,
+                () -> mobileQueryAppService.articleFeed(CHANNEL, topics.get(0).getComponentId(),
+                        page.getReleaseId(), null, 1));
+        assertEquals(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT, invalidComponent.getErrorCode());
         assertEquals(4, pageAppService.getDraft(CHANNEL).getComponents().size());
     }
 

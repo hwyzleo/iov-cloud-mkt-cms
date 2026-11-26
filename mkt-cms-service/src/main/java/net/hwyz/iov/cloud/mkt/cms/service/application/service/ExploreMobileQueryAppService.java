@@ -118,12 +118,13 @@ public class ExploreMobileQueryAppService {
      * 信息流翻页（同一发布版本 keyset）
      *
      * @param channelCode 频道编码
+     * @param componentId 首页返回的文章流组件标识
      * @param releaseId   首页返回的发布版本
      * @param cursor      不透明游标
      * @param pageSize    页大小
      * @return 信息流分页
      */
-    public Map<String, Object> articleFeed(String channelCode, String releaseId, String cursor,
+    public Map<String, Object> articleFeed(String channelCode, String componentId, String releaseId, String cursor,
                                            Integer pageSize) {
         Instant now = Instant.now(clock);
         int size = normalizePageSize(pageSize);
@@ -135,17 +136,15 @@ public class ExploreMobileQueryAppService {
         }
         ExploreComponentData feed = null;
         for (ExploreComponentData data : contentService.load(page.getPageId())) {
-            if (data.getComponent().getComponentType() == ExploreComponentType.ARTICLE_FEED) {
+            if (data.getComponent().getComponentType() == ExploreComponentType.ARTICLE_FEED
+                    && data.getComponent().getComponentId().equals(componentId)) {
                 feed = data;
                 break;
             }
         }
         if (feed == null) {
-            Map<String, Object> empty = new LinkedHashMap<>();
-            empty.put("releaseId", releaseId);
-            empty.put("items", List.of());
-            empty.put("hasMore", false);
-            return empty;
+            throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                    "文章流组件不存在或不属于当前发布版本");
         }
         Integer lastSortNo = null;
         String lastItemId = null;

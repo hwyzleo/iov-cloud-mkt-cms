@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * 探索页页面组件。
  * <p>
- * MKT-CMS-DSN-CR-003 §4.2 / D-011：首版每类组件每页最多一个，使用显式排序。
+ * MKT-CMS-DSN-CR-003 §4.2 / D-011：同类组件可多次添加，使用独立组件标识与显式排序。
  *
  * @author hwyz_leo
  */

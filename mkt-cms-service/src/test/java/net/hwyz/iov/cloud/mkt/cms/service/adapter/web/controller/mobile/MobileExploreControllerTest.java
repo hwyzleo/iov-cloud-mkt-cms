@@ -84,6 +84,30 @@ class MobileExploreControllerTest {
     }
 
     @Test
+    @DisplayName("文章流翻页必须携带 componentId 并返回对应组件")
+    void 文章流翻页组件契约() throws Exception {
+        when(mobileQueryAppService.articleFeed("RECOMMEND", "ecp_02", "er_01", "cursor_01", 10))
+                .thenReturn(Map.of("releaseId", "er_01", "componentId", "ecp_02",
+                        "items", List.of(), "hasMore", false));
+
+        mockMvc.perform(get("/api/mobile/explore/v1/article-feed")
+                        .param("channelCode", "RECOMMEND")
+                        .param("componentId", "ecp_02")
+                        .param("releaseId", "er_01")
+                        .param("cursor", "cursor_01")
+                        .param("pageSize", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.releaseId").value("er_01"))
+                .andExpect(jsonPath("$.data.componentId").value("ecp_02"));
+
+        mockMvc.perform(get("/api/mobile/explore/v1/article-feed")
+                        .param("channelCode", "RECOMMEND")
+                        .param("releaseId", "er_01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(105009));
+    }
+
+    @Test
     @DisplayName("文章详情返回官方正文，UGC 引用不返回正文")
     void 文章详情契约() throws Exception {
         when(mobileQueryAppService.articleDetail("ea_01", "ear_01"))
