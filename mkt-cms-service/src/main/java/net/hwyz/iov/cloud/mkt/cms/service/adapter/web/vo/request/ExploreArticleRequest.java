@@ -23,6 +23,11 @@ public class ExploreArticleRequest {
 
     private ExploreImageRequest cover;
 
+    /**
+     * 多图列表（最多 9 张）；优先使用，为空时兼容单封面 cover
+     */
+    private java.util.List<ExploreImageRequest> images;
+
     private String authorName;
 
     private String authorAvatarUrl;

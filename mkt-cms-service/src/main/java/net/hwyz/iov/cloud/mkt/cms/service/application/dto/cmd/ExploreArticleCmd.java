@@ -25,6 +25,11 @@ public class ExploreArticleCmd {
 
     private final ExploreImage cover;
 
+    /**
+     * 多图列表（最多 9 张）；为空时兼容使用 cover
+     */
+    private final java.util.List<ExploreImage> images;
+
     private final String authorName;
 
     private final String authorAvatarUrl;

@@ -168,7 +168,7 @@ class ExploreFlowIT {
                 "cms_explore_article_revision", "cms_explore_topic", "cms_explore_topic_revision",
                 "cms_explore_topic_item", "cms_explore_banner", "cms_explore_banner_revision",
                 "cms_explore_page", "cms_explore_page_component", "cms_explore_page_item",
-                "cms_explore_page_current", "cms_explore_operation"}) {
+                "cms_explore_page_current", "cms_explore_article_image", "cms_explore_operation"}) {
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement statement = connection.prepareStatement(
                          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() "
@@ -186,6 +186,8 @@ class ExploreFlowIT {
         assertEquals(1, countIndex("cms_explore_page", "uk_page_channel_version"));
         assertEquals(1, countIndex("cms_explore_page", "uk_page_request_id"));
         assertEquals(1, countIndex("cms_explore_page_item", "idx_item_cursor"));
+        assertEquals(1, countIndex("cms_explore_article_image", "uk_article_image_sort"));
+        assertEquals(0, countIndex("cms_explore_page_component", "uk_component_page_type"));
     }
 
     @Test
@@ -452,6 +454,94 @@ class ExploreFlowIT {
     }
 
     @Test
+    @DisplayName("文章多图：最多 9 张、返回数量与布局建议")
+    void 文章多图() {
+        ExploreArticleView article = articleAppService.create(ExploreArticleCmd.builder()
+                .sourceType("OFFICIAL")
+                .title("多图文章")
+                .summary("多图摘要")
+                .images(List.of(testImage("https://assets.example/1.jpg", "image/jpeg"),
+                        testImage("https://assets.example/2.jpg", "image/jpeg")))
+                .body("<p>多图正文</p>")
+                .operator(OPERATOR)
+                .build());
+        ExploreArticleView published = articleAppService.publish(ExploreContentPublishCmd.builder()
+                .objectId(article.getArticle().getArticleId()).operator(OPERATOR).build());
+
+        Map<String, Object> detail = mobileQueryAppService.articleDetail(
+                article.getArticle().getArticleId(), published.getRevision().getRevisionId());
+        assertEquals(2, detail.get("imageCount"));
+        assertEquals("TWO_COLUMNS", detail.get("imageLayout"));
+        assertEquals(2, ((List<?>) detail.get("images")).size());
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cms_explore_article_image WHERE article_revision_id = ?",
+                Integer.class, published.getRevision().getRevisionId()));
+
+        ExploreException tooMany = assertThrows(ExploreException.class,
+                () -> articleAppService.create(ExploreArticleCmd.builder()
+                        .sourceType("OFFICIAL")
+                        .title("超过九图")
+                        .body("<p>正文</p>")
+                        .images(java.util.stream.IntStream.range(1, 11)
+                                .mapToObj(index -> testImage("https://assets.example/" + index + ".jpg",
+                                        "image/jpeg"))
+                                .toList())
+                        .operator(OPERATOR)
+                        .build()));
+        assertEquals(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT, tooMany.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("同类组件可多次添加，专题样式与组件标题生效")
+    void 同类组件多次与专题样式() {
+        ExploreArticleView article = publishedArticle("多组件文章", "<p>正文</p>");
+        ExploreTopicView topic = publishedTopic("多组件专题", article);
+
+        ExplorePageSaveCmd.Component topicScroll = ExplorePageSaveCmd.Component.builder()
+                .type(ExploreComponentType.TOPIC_GRID.name())
+                .sortNo(10)
+                .config(Map.of("title", "横滑专题", "style", "HORIZONTAL_SCROLL"))
+                .items(List.of(item(ExploreItemType.TOPIC, topic.getTopic().getTopicId(),
+                        topic.getRevision().getRevisionId(), 10)))
+                .build();
+        ExplorePageSaveCmd.Component topicText = ExplorePageSaveCmd.Component.builder()
+                .type(ExploreComponentType.TOPIC_GRID.name())
+                .sortNo(20)
+                .config(Map.of("title", "图文专题", "style", "IMAGE_TEXT_LIST"))
+                .items(List.of(item(ExploreItemType.TOPIC, topic.getTopic().getTopicId(),
+                        topic.getRevision().getRevisionId(), 10)))
+                .build();
+        ExplorePageSaveCmd.Component feedOne = ExplorePageSaveCmd.Component.builder()
+                .type(ExploreComponentType.ARTICLE_FEED.name())
+                .sortNo(30)
+                .config(Map.of("title", "推荐阅读"))
+                .items(List.of(item(ExploreItemType.ARTICLE, article.getArticle().getArticleId(),
+                        article.getRevision().getRevisionId(), 10)))
+                .build();
+        ExplorePageSaveCmd.Component feedTwo = ExplorePageSaveCmd.Component.builder()
+                .type(ExploreComponentType.ARTICLE_FEED.name())
+                .sortNo(40)
+                .config(Map.of("title", "更多内容"))
+                .items(List.of(item(ExploreItemType.ARTICLE, article.getArticle().getArticleId(),
+                        article.getRevision().getRevisionId(), 10)))
+                .build();
+        savePage(0, List.of(topicScroll, topicText, feedOne, feedTwo));
+        publishPage("req-multi-components", null, "IMMEDIATE", null, null);
+
+        ExplorePageView page = mobileQueryAppService.currentPage(CHANNEL, 10);
+        assertEquals(4, page.getComponents().size());
+        List<ExploreComponentView> topics = page.getComponents().stream()
+                .filter(component -> "TOPIC_GRID".equals(component.getType())).toList();
+        assertEquals(2, topics.size());
+        assertEquals("HORIZONTAL_SCROLL", topics.get(0).getConfig().get("style"));
+        assertEquals("横滑专题", topics.get(0).getConfig().get("title"));
+        assertEquals("IMAGE_TEXT_LIST", topics.get(1).getConfig().get("style"));
+        assertEquals(2, page.getComponents().stream()
+                .filter(component -> "ARTICLE_FEED".equals(component.getType())).count());
+        assertEquals(4, pageAppService.getDraft(CHANNEL).getComponents().size());
+    }
+
+    @Test
     @DisplayName("AT-014：页面草稿乐观锁冲突不静默覆盖")
     void 页面草稿乐观锁() {
         ExploreArticleView article = publishedArticle("文章", "<p>正文</p>");
@@ -460,6 +550,16 @@ class ExploreFlowIT {
         ExploreException conflict = assertThrows(ExploreException.class,
                 () -> savePage(0, List.of(feedComponent(List.of(article)))));
         assertEquals(ExploreErrorCode.EXPLORE_VERSION_CONFLICT, conflict.getErrorCode());
+    }
+
+    private ExploreImage testImage(String url, String mime) {
+        return ExploreImage.builder()
+                .url(url)
+                .width(1200)
+                .height(800)
+                .mime(mime)
+                .size(1024L)
+                .build();
     }
 
     private ExploreArticleView publishedArticle(String title, String body) {

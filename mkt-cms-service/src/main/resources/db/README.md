@@ -45,6 +45,8 @@ spring:
 | V1.0.1 | 车端激活协议初始基线内容：隐私政策 + 用户协议两份修订与成套发布包（MKT-CMS-DSN-CR-001） |
 | V1.1.0 | 探索页内容运营建表：频道、文章/专题/Banner 根实体与不可变修订、页面草稿/发布版本/组件/条目、当前指针、操作留痕（MKT-CMS-DSN-CR-003） |
 | V1.1.1 | 探索页预置频道：RECOMMEND / ACTIVITY / LOCAL，重放不覆盖运营调整（MKT-CMS-DSN-CR-003） |
+| V1.1.2 | 探索页文章多图：新增 cms_explore_article_image 并回填旧封面（MKT-CMS-DSN-CR-003 v0.4） |
+| V1.1.3 | 探索页同类组件可多次添加：删除组件类型唯一索引（MKT-CMS-DSN-CR-003 v0.4） |
 
 ## 注意事项
 

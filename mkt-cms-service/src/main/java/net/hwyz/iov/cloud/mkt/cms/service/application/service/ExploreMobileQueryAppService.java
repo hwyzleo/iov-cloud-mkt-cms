@@ -30,6 +30,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreChannelReposi
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExplorePageRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreTopicRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ExploreCursorCodec;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ExploreImageLayout;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.config.ExploreProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -205,7 +206,14 @@ public class ExploreMobileQueryAppService {
         view.put("sourceType", article.getSourceType().name());
         view.put("title", revision.getTitle());
         view.put("summary", revision.getSummary());
-        view.put("cover", imageView(revision.getCover()));
+        List<ExploreImage> images = articleRepository.findRevisionImages(revisionId);
+        if (images.isEmpty() && revision.getCover() != null) {
+            images = List.of(revision.getCover());
+        }
+        view.put("cover", imageView(images.isEmpty() ? null : images.get(0)));
+        view.put("images", images.stream().map(this::imageView).toList());
+        view.put("imageCount", images.size());
+        view.put("imageLayout", ExploreImageLayout.of(images.size()));
         view.put("authorName", revision.getAuthorName());
         view.put("authorAvatarUrl", revision.getAuthorAvatarUrl());
         view.put("displayAt", iso(revision.getDisplayAt()));
@@ -394,7 +402,10 @@ public class ExploreMobileQueryAppService {
         if (type == ExploreComponentType.BANNER_CAROUSEL) {
             view.putIfAbsent("intervalSeconds", 5);
         } else if (type == ExploreComponentType.TOPIC_GRID) {
-            view.putIfAbsent("columns", 4);
+            view.putIfAbsent("style", "ADAPTIVE_GRID");
+            if ("ADAPTIVE_GRID".equals(view.get("style"))) {
+                view.putIfAbsent("columns", 4);
+            }
         }
         return view;
     }
@@ -415,6 +426,8 @@ public class ExploreMobileQueryAppService {
         view.put("url", image.getUrl());
         view.put("width", image.getWidth());
         view.put("height", image.getHeight());
+        view.put("mime", image.getMime());
+        view.put("size", image.getSize());
         return view;
     }
 

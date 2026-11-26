@@ -51,7 +51,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ExplorePageAppService {
 
-    private static final int MAX_COMPONENTS = 3;
+    private static final int MAX_COMPONENTS = 20;
 
     private static final int MAX_ITEMS_PER_COMPONENT = 200;
 
@@ -295,15 +295,10 @@ public class ExplorePageAppService {
             throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
                     "每页最多 " + MAX_COMPONENTS + " 个组件");
         }
-        Set<ExploreComponentType> types = new HashSet<>();
         Set<Integer> componentSorts = new HashSet<>();
         List<ExploreComponentData> result = new ArrayList<>();
         for (ExplorePageSaveCmd.Component cmd : components) {
             ExploreComponentType type = ExploreComponentType.parse(cmd.getType());
-            if (!types.add(type)) {
-                throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
-                        "每类组件每页最多一个: " + type.name());
-            }
             if (cmd.getSortNo() == null || cmd.getSortNo() < 0 || !componentSorts.add(cmd.getSortNo())) {
                 throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
                         "组件排序不能为空、不得为负且不得重复");
@@ -314,7 +309,7 @@ public class ExplorePageAppService {
                     .pageId(pageId)
                     .componentType(type)
                     .sortNo(cmd.getSortNo())
-                    .config(cmd.getConfig() == null ? new LinkedHashMap<>() : new LinkedHashMap<>(cmd.getConfig()))
+                    .config(normalizeConfig(type, cmd.getConfig()))
                     .build();
             List<ExplorePageItem> items = buildItems(type, componentId, cmd.getItems(), operator, now);
             result.add(new ExploreComponentData(component, items));
@@ -356,6 +351,59 @@ public class ExplorePageAppService {
             result.add(contentService.resolveDraftItem(item));
         }
         return result;
+    }
+
+    private int configInt(Object value, int defaultValue, String field) {
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (NumberFormatException exception) {
+            throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                    field + " 必须为整数");
+        }
+    }
+
+    private Map<String, Object> normalizeConfig(ExploreComponentType type, Map<String, Object> raw) {
+        Map<String, Object> config = raw == null ? new LinkedHashMap<>() : new LinkedHashMap<>(raw);
+        Object title = config.get("title");
+        if (title != null) {
+            String normalized = ExploreGuard.optionalText(String.valueOf(title), "组件标题", 64);
+            if (normalized == null) {
+                config.remove("title");
+            } else {
+                config.put("title", normalized);
+            }
+        }
+        if (type == ExploreComponentType.TOPIC_GRID) {
+            String style = config.get("style") == null ? "ADAPTIVE_GRID"
+                    : String.valueOf(config.get("style")).trim().toUpperCase(java.util.Locale.ROOT);
+            if (!java.util.Set.of("ADAPTIVE_GRID", "HORIZONTAL_SCROLL", "IMAGE_TEXT_LIST").contains(style)) {
+                throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                        "不支持的专题展示样式: " + style);
+            }
+            config.put("style", style);
+            if ("ADAPTIVE_GRID".equals(style)) {
+                int columns = configInt(config.get("columns"), 4, "专题网格列数");
+                if (columns < 2 || columns > 4) {
+                    throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                            "专题网格列数仅支持 2/3/4");
+                }
+                config.put("columns", columns);
+            } else {
+                config.remove("columns");
+            }
+        }
+        if (type == ExploreComponentType.BANNER_CAROUSEL) {
+            int interval = configInt(config.get("intervalSeconds"), 5, "Banner 轮播间隔");
+            if (interval < 3 || interval > 10) {
+                throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                        "Banner 轮播间隔仅支持 3～10 秒");
+            }
+            config.put("intervalSeconds", interval);
+        }
+        return config;
     }
 
     private ExploreItemType expectedItemType(ExploreComponentType componentType) {

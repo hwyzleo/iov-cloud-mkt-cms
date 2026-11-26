@@ -38,4 +38,20 @@ public interface ExploreArticleRepository {
     Optional<ExploreArticleRevision> findLatestDraft(String articleId);
 
     Optional<ExploreArticleRevision> findLatestRevision(String articleId);
+
+    /**
+     * 替换修订图片（草稿可替换；发布修订不可变，不再调用）
+     *
+     * @param revisionId 修订标识
+     * @param images     图片列表
+     */
+    void replaceRevisionImages(String revisionId, java.util.List<net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage> images);
+
+    /**
+     * 查询修订图片（按 sort_no）
+     *
+     * @param revisionId 修订标识
+     * @return 图片列表
+     */
+    java.util.List<net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage> findRevisionImages(String revisionId);
 }

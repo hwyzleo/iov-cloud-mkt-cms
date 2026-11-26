@@ -23,6 +23,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExplorePageData
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExplorePublishResult;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExploreTopicView;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreTargetType;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ExploreImageLayout;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticleRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBanner;
@@ -75,6 +76,8 @@ public final class ExploreWebAssembler {
                 .title(request.getTitle())
                 .summary(request.getSummary())
                 .cover(toImage(request.getCover()))
+                .images(request.getImages() == null ? null : request.getImages().stream()
+                        .map(ExploreWebAssembler::toImage).toList())
                 .authorName(request.getAuthorName())
                 .authorAvatarUrl(request.getAuthorAvatarUrl())
                 .displayAt(request.getDisplayAt())
@@ -297,7 +300,11 @@ public final class ExploreWebAssembler {
                 ? null : revision.getStatus().name());
         view.put("title", revision == null ? null : revision.getTitle());
         view.put("summary", revision == null ? null : revision.getSummary());
-        view.put("cover", image(revision == null ? null : revision.getCover()));
+        List<ExploreImage> images = articleImages(revision);
+        view.put("cover", image(images.isEmpty() ? null : images.get(0)));
+        view.put("images", images.stream().map(ExploreWebAssembler::image).toList());
+        view.put("imageCount", images.size());
+        view.put("imageLayout", ExploreImageLayout.of(images.size()));
         view.put("authorName", revision == null ? null : revision.getAuthorName());
         view.put("authorAvatarUrl", revision == null ? null : revision.getAuthorAvatarUrl());
         view.put("displayAt", revision == null ? null : iso(revision.getDisplayAt()));
@@ -399,6 +406,17 @@ public final class ExploreWebAssembler {
             components.add(view);
         }
         return components;
+    }
+
+    private static List<ExploreImage> articleImages(ExploreArticleRevision revision) {
+        if (revision == null) {
+            return List.of();
+        }
+        List<ExploreImage> images = revision.getImages();
+        if ((images == null || images.isEmpty()) && revision.getCover() != null) {
+            return List.of(revision.getCover());
+        }
+        return images == null ? List.of() : images;
     }
 
     private static Map<String, Object> image(ExploreImage image) {

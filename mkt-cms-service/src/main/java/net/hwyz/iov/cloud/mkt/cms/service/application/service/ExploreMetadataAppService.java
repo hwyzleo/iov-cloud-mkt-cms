@@ -45,11 +45,16 @@ public class ExploreMetadataAppService {
         view.put("nativeRouteCodes", sorted(properties.getNativeRouteCodes()));
         view.put("nativeParamKeys", sorted(properties.getNativeParamKeys()));
         view.put("imageMimeTypes", List.of("image/jpeg", "image/png", "image/webp"));
+        view.put("topicStyles", List.of("ADAPTIVE_GRID", "HORIZONTAL_SCROLL", "IMAGE_TEXT_LIST"));
+        view.put("articleImageLayouts", List.of("SINGLE", "TWO_COLUMNS", "ONE_LARGE_TWO_SMALL",
+                "TWO_BY_TWO", "THREE_COLUMNS", "NINE_GRID_WITH_COUNT"));
 
         Map<String, Object> constraints = new LinkedHashMap<>();
         constraints.put("maxTitleLength", 255);
         constraints.put("maxSummaryLength", 1024);
-        constraints.put("maxPageComponents", 3);
+        constraints.put("maxPageComponents", 20);
+        constraints.put("maxArticleImages", 9);
+        constraints.put("topicColumns", List.of(2, 3, 4));
         constraints.put("feedPageSizeDefault", properties.getFeedPageSizeDefault());
         constraints.put("feedPageSizeMax", properties.getFeedPageSizeMax());
         constraints.put("itemTimeRule", "endAt 必须晚于 startAt；endAt 不含");

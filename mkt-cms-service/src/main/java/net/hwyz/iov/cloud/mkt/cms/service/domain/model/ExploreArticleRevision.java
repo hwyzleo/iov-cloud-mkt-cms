@@ -38,6 +38,11 @@ public class ExploreArticleRevision {
 
     private ExploreImage cover;
 
+    /**
+     * 多图列表（最多 9 张，按展示顺序）
+     */
+    private java.util.List<ExploreImage> images;
+
     private String authorName;
 
     private String authorAvatarUrl;

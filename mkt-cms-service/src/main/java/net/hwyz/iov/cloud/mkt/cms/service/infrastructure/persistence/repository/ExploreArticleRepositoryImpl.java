@@ -8,10 +8,13 @@ import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreRevisionStatus;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticleRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticleSearchCriteria;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreArticleRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.converter.ExploreConverter;
+import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExploreArticleImageMapper;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExploreArticleMapper;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExploreArticleRevisionMapper;
+import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreArticleImagePo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreArticlePo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreArticleRevisionPo;
 import org.springframework.stereotype.Repository;
@@ -33,6 +36,7 @@ public class ExploreArticleRepositoryImpl implements ExploreArticleRepository {
 
     private final ExploreArticleMapper articleMapper;
     private final ExploreArticleRevisionMapper revisionMapper;
+    private final ExploreArticleImageMapper imageMapper;
 
     @Override
     public void insert(ExploreArticle article) {
@@ -164,5 +168,42 @@ public class ExploreArticleRepositoryImpl implements ExploreArticleRepository {
                         .orderByDesc("revision_no")
                         .last("LIMIT 1")))
                 .map(ExploreConverter::toDomain);
+    }
+
+    @Override
+    public void replaceRevisionImages(String revisionId, List<ExploreImage> images) {
+        imageMapper.delete(new QueryWrapper<ExploreArticleImagePo>()
+                .eq("article_revision_id", revisionId));
+        if (images == null || images.isEmpty()) {
+            return;
+        }
+        int sortNo = 10;
+        for (ExploreImage image : images) {
+            ExploreArticleImagePo po = new ExploreArticleImagePo();
+            po.setArticleRevisionId(revisionId);
+            po.setSortNo(sortNo);
+            po.setUrl(image.getUrl());
+            po.setWidth(image.getWidth());
+            po.setHeight(image.getHeight());
+            po.setMime(image.getMime());
+            po.setSize(image.getSize());
+            imageMapper.insert(po);
+            sortNo += 10;
+        }
+    }
+
+    @Override
+    public List<ExploreImage> findRevisionImages(String revisionId) {
+        return imageMapper.selectList(new QueryWrapper<ExploreArticleImagePo>()
+                        .eq("article_revision_id", revisionId)
+                        .orderByAsc("sort_no")).stream()
+                .map(po -> ExploreImage.builder()
+                        .url(po.getUrl())
+                        .width(po.getWidth())
+                        .height(po.getHeight())
+                        .mime(po.getMime())
+                        .size(po.getSize())
+                        .build())
+                .collect(Collectors.toList());
     }
 }

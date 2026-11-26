@@ -174,7 +174,8 @@ public class ExplorePageContentService {
                 requireVisible(requireVisible, article.getStatus(), refId);
                 Map<String, Object> snapshot = ExploreDisplaySnapshot.article(
                         article.getArticleId(), revision.getRevisionId(), article.getSourceType().name(),
-                        revision.getTitle(), revision.getSummary(), revision.getCover(),
+                        revision.getTitle(), revision.getSummary(),
+                        articleRepository.findRevisionImages(revision.getRevisionId()),
                         revision.getAuthorName(), revision.getAuthorAvatarUrl(),
                         revision.getDisplayAt() == null ? null
                                 : DateTimeFormatter.ISO_INSTANT.format(revision.getDisplayAt()));

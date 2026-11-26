@@ -6,6 +6,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTarget;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,7 +42,7 @@ public final class ExploreDisplaySnapshot {
      * @return 快照
      */
     public static Map<String, Object> article(String articleId, String revisionId, String sourceType,
-                                              String title, String summary, ExploreImage cover,
+                                              String title, String summary, List<ExploreImage> images,
                                               String authorName, String avatarUrl, String displayAt) {
         Map<String, Object> snapshot = base("ARTICLE");
         snapshot.put("articleId", articleId);
@@ -49,7 +50,11 @@ public final class ExploreDisplaySnapshot {
         snapshot.put("sourceType", sourceType);
         snapshot.put("title", title);
         snapshot.put("summary", summary);
-        putImage(snapshot, "cover", cover);
+        List<ExploreImage> safeImages = images == null ? List.of() : images;
+        putImage(snapshot, "cover", safeImages.isEmpty() ? null : safeImages.get(0));
+        snapshot.put("images", safeImages.stream().map(ExploreDisplaySnapshot::imageView).toList());
+        snapshot.put("imageCount", safeImages.size());
+        snapshot.put("imageLayout", ExploreImageLayout.of(safeImages.size()));
         snapshot.put("authorName", authorName);
         snapshot.put("authorAvatarUrl", avatarUrl);
         snapshot.put("displayAt", displayAt);
@@ -135,6 +140,16 @@ public final class ExploreDisplaySnapshot {
         snapshot.put("schemaVersion", SCHEMA_VERSION);
         snapshot.put("itemType", itemType);
         return snapshot;
+    }
+
+    private static Map<String, Object> imageView(ExploreImage image) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("url", image.getUrl());
+        view.put("width", image.getWidth());
+        view.put("height", image.getHeight());
+        view.put("mime", image.getMime());
+        view.put("size", image.getSize());
+        return view;
     }
 
     private static void putImage(Map<String, Object> snapshot, String field, ExploreImage image) {

@@ -68,7 +68,7 @@ public class ExploreArticleAppService {
                             ? articleRepository.findLatestRevision(article.getArticleId())
                             : articleRepository.findRevision(article.getCurrentRevisionId()))
                     .orElse(null);
-            return new ExploreArticleView(article, revision);
+            return new ExploreArticleView(article, withImages(revision));
         });
     }
 
@@ -87,7 +87,7 @@ public class ExploreArticleAppService {
                         ? articleRepository.findLatestRevision(articleId)
                         : articleRepository.findRevision(article.getCurrentRevisionId()))
                 .orElse(null);
-        return new ExploreArticleView(article, revision);
+        return new ExploreArticleView(article, withImages(revision));
     }
 
     /**
@@ -106,6 +106,7 @@ public class ExploreArticleAppService {
         ExploreArticleRevision revision = buildRevision(articleId, 1, sourceType, cmd, operator, now);
         articleRepository.insert(article);
         articleRepository.insertRevision(revision);
+        articleRepository.replaceRevisionImages(revision.getRevisionId(), revision.getImages());
         audit(ExploreAction.CREATE, articleId, operator, now, "sourceType=" + sourceType.name());
         log.info("探索页文章创建成功: articleId={}, sourceType={}, operator={}", articleId, sourceType, operator);
         return new ExploreArticleView(article, revision);
@@ -143,12 +144,14 @@ public class ExploreArticleAppService {
                 throw new ExploreException(ExploreErrorCode.EXPLORE_VERSION_CONFLICT,
                         "草稿修订已被并发修改，请重试");
             }
+            articleRepository.replaceRevisionImages(revision.getRevisionId(), revision.getImages());
         } else {
             int nextRevisionNo = articleRepository.findLatestRevision(articleId)
                     .map(latest -> latest.getRevisionNo() + 1)
                     .orElse(1);
             revision = buildRevision(articleId, nextRevisionNo, article.getSourceType(), cmd, operator, now);
             articleRepository.insertRevision(revision);
+            articleRepository.replaceRevisionImages(revision.getRevisionId(), revision.getImages());
         }
         ExploreArticle updated = article.touched(operator, now);
         if (articleRepository.update(updated, expectedLockVersion) == 0) {
@@ -182,7 +185,7 @@ public class ExploreArticleAppService {
         }
         if (revision.getStatus() == ExploreRevisionStatus.PUBLISHED) {
             if (revision.getRevisionId().equals(article.getCurrentRevisionId())) {
-                return new ExploreArticleView(article, revision);
+                return new ExploreArticleView(article, withImages(revision));
             }
             throw new ExploreException(ExploreErrorCode.EXPLORE_VERSION_CONFLICT,
                     "已发布修订不可重复发布，请创建新草稿修订");
@@ -203,7 +206,7 @@ public class ExploreArticleAppService {
                 "revisionId=" + revision.getRevisionId());
         log.info("探索页文章发布成功: articleId={}, revisionId={}, operator={}",
                 articleId, revision.getRevisionId(), operator);
-        return new ExploreArticleView(updated, published);
+        return new ExploreArticleView(updated, withImages(published));
     }
 
     /**
@@ -235,17 +238,17 @@ public class ExploreArticleAppService {
 
     private ExploreArticleRevision currentRevision(ExploreArticle article) {
         if (article.getCurrentRevisionId() == null) {
-            return articleRepository.findLatestRevision(article.getArticleId()).orElse(null);
+            return withImages(articleRepository.findLatestRevision(article.getArticleId()).orElse(null));
         }
-        return articleRepository.findRevision(article.getCurrentRevisionId()).orElse(null);
+        return withImages(articleRepository.findRevision(article.getCurrentRevisionId()).orElse(null));
     }
 
     private ExploreArticleRevision buildRevision(String articleId, int revisionNo, ExploreSourceType sourceType,
                                                  ExploreArticleCmd cmd, String operator, Instant now) {
         String title = ExploreGuard.requireText(cmd.getTitle(), "标题", 255);
         String summary = ExploreGuard.optionalText(cmd.getSummary(), "摘要", 1024);
-        ExploreImage cover = cmd.getCover();
-        mediaValidator.validateOptionalImage(cover, "封面");
+        List<ExploreImage> images = normalizeImages(cmd);
+        ExploreImage cover = images.isEmpty() ? null : images.get(0);
         String authorName = ExploreGuard.optionalText(cmd.getAuthorName(), "作者显示名", 128);
         String avatarUrl = ExploreGuard.optionalText(cmd.getAuthorAvatarUrl(), "作者头像", 1024);
         if (avatarUrl != null) {
@@ -261,6 +264,7 @@ public class ExploreArticleAppService {
                 .title(title)
                 .summary(summary)
                 .cover(cover)
+                .images(images)
                 .authorName(authorName)
                 .authorAvatarUrl(avatarUrl)
                 .displayAt(displayAt)
@@ -273,7 +277,7 @@ public class ExploreArticleAppService {
             SanitizedHtml sanitized = htmlSanitizer.sanitize(cmd.getBody());
             builder.contentType(SanitizedHtml.CONTENT_TYPE)
                     .body(sanitized.getBody())
-                    .contentHash(HexSha256.ofUtf8(sanitized.getBody()))
+                    .contentHash(HexSha256.ofUtf8(sanitized.getBody() + ExploreJson.write(imageHashPayload(images))))
                     .sanitizerVersion(sanitized.getSanitizerVersion());
         } else {
             validateUgc(cmd);
@@ -281,7 +285,7 @@ public class ExploreArticleAppService {
                     .contentType(null)
                     .sourceContentId(cmd.getSourceContentId().trim())
                     .nativeRouteCode(cmd.getNativeRouteCode().trim())
-                    .contentHash(ugcHash(title, summary, cover, authorName, avatarUrl, displayAt,
+                    .contentHash(ugcHash(title, summary, images, authorName, avatarUrl, displayAt,
                             cmd.getSourceContentId().trim(), cmd.getNativeRouteCode().trim()));
         }
         return builder.build();
@@ -313,22 +317,64 @@ public class ExploreArticleAppService {
         }
     }
 
-    private String ugcHash(String title, String summary, ExploreImage cover, String authorName,
+    private String ugcHash(String title, String summary, List<ExploreImage> images, String authorName,
                            String avatarUrl, Instant displayAt, String sourceContentId, String routeCode) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("sourceType", ExploreSourceType.UGC_REFERENCE.name());
         payload.put("title", title);
         payload.put("summary", summary);
-        payload.put("cover", cover == null ? null : Map.of(
-                "url", cover.getUrl() == null ? "" : cover.getUrl(),
-                "width", cover.getWidth() == null ? 0 : cover.getWidth(),
-                "height", cover.getHeight() == null ? 0 : cover.getHeight()));
+        payload.put("images", imageHashPayload(images));
         payload.put("authorName", authorName);
         payload.put("authorAvatarUrl", avatarUrl);
         payload.put("displayAt", displayAt == null ? null : displayAt.toString());
         payload.put("sourceContentId", sourceContentId);
         payload.put("nativeRouteCode", routeCode);
         return HexSha256.ofUtf8(ExploreJson.write(payload));
+    }
+
+    private List<ExploreImage> normalizeImages(ExploreArticleCmd cmd) {
+        List<ExploreImage> images = cmd.getImages() == null ? List.of() : cmd.getImages();
+        if (images.isEmpty() && cmd.getCover() != null) {
+            images = List.of(cmd.getCover());
+        }
+        if (images.size() > 9) {
+            throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                    "文章图片最多 9 张");
+        }
+        for (int index = 0; index < images.size(); index++) {
+            ExploreImage image = images.get(index);
+            if (image == null) {
+                throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                        "第 " + (index + 1) + " 张图片不能为空");
+            }
+            mediaValidator.validateRequiredImage(image, "第 " + (index + 1) + " 张图片");
+        }
+        return List.copyOf(images);
+    }
+
+    private List<Map<String, Object>> imageHashPayload(List<ExploreImage> images) {
+        List<Map<String, Object>> payload = new java.util.ArrayList<>();
+        for (ExploreImage image : images) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("url", image.getUrl());
+            view.put("width", image.getWidth());
+            view.put("height", image.getHeight());
+            view.put("mime", image.getMime());
+            view.put("size", image.getSize());
+            payload.add(view);
+        }
+        return payload;
+    }
+
+    private ExploreArticleRevision withImages(ExploreArticleRevision revision) {
+        if (revision == null) {
+            return null;
+        }
+        List<ExploreImage> images = articleRepository.findRevisionImages(revision.getRevisionId());
+        if (images.isEmpty() && revision.getCover() != null) {
+            images = List.of(revision.getCover());
+        }
+        return revision.toBuilder().images(images).build();
     }
 
     private void audit(ExploreAction action, String articleId, String operator, Instant now, String detail) {
