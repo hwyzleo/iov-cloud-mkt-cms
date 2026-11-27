@@ -281,10 +281,7 @@ public class ExploreMobileQueryAppService {
         view.put("imageCount", images.size());
         view.put("imageLayout", ExploreImageLayout.of(images.size()));
         view.put("target", revision.getTarget() == null ? Map.of() : revision.getTarget().toView());
-        view.put("items", visible.stream()
-                .map(item -> item.getDisplaySnapshot() == null
-                        ? new LinkedHashMap<String, Object>() : new LinkedHashMap<>(item.getDisplaySnapshot()))
-                .toList());
+        view.put("items", visible.stream().map(ExploreTopicItem::displayView).toList());
         view.put("hasMore", hasMore);
         if (nextCursor != null) {
             view.put("nextCursor", nextCursor);

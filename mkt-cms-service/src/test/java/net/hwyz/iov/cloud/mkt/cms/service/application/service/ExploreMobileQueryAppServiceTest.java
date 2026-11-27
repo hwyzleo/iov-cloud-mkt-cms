@@ -8,11 +8,13 @@ import net.hwyz.iov.cloud.mkt.cms.service.common.exception.ExploreErrorCode;
 import net.hwyz.iov.cloud.mkt.cms.service.common.exception.ExploreException;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreContentStatus;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreRevisionStatus;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannel;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePageComponent;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopic;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopicItem;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopicRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreArticleRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreBannerRepository;
@@ -31,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -147,6 +150,61 @@ class ExploreMobileQueryAppServiceTest {
         Map<String, Object> cover = (Map<String, Object>) detail.get("cover");
         assertEquals("https://assets.example/a.png", cover.get("url"));
         assertFalse((Boolean) detail.get("hasMore"));
+    }
+
+    @Test
+    @DisplayName("专题详情非空文章条目携带 itemId 与 sortNo，避免手机端全量丢弃")
+    void 专题详情文章条目契约() {
+        when(topicRepository.findByTopicId("tp_01")).thenReturn(Optional.of(ExploreTopic.builder()
+                .topicId("tp_01")
+                .status(ExploreContentStatus.PUBLISHED)
+                .currentRevisionId("tr_01")
+                .lockVersion(1)
+                .build()));
+        when(topicRepository.findRevision("tr_01")).thenReturn(Optional.of(ExploreTopicRevision.builder()
+                .revisionId("tr_01")
+                .topicId("tp_01")
+                .revisionNo(1)
+                .status(ExploreRevisionStatus.PUBLISHED)
+                .name("专题")
+                .summary("摘要")
+                .build()));
+        when(topicRepository.findRevisionImages("tr_01")).thenReturn(List.of(image("a.png")));
+        when(topicRepository.listItemsAfter("tr_01", null, 11)).thenReturn(List.of(
+                topicItem("arv_01", "ar_01", 10, "文章一"),
+                topicItem("arv_02", "ar_02", 20, "文章二")));
+        when(articleRepository.findByIds(any())).thenReturn(List.of(
+                ExploreArticle.builder().articleId("ar_01").status(ExploreContentStatus.PUBLISHED).build(),
+                ExploreArticle.builder().articleId("ar_02").status(ExploreContentStatus.PUBLISHED).build()));
+
+        Map<String, Object> detail = mobileQueryAppService.topicDetail("tp_01", "tr_01", null, 10);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) detail.get("items");
+        assertEquals(2, items.size());
+        assertEquals("arv_01", items.get(0).get("itemId"));
+        assertEquals("ARTICLE", items.get(0).get("itemType"));
+        assertEquals("ar_01", items.get(0).get("articleId"));
+        assertEquals(10, items.get(0).get("sortNo"));
+        assertEquals("文章一", items.get(0).get("title"));
+        assertEquals("arv_02", items.get(1).get("itemId"));
+        assertEquals(20, items.get(1).get("sortNo"));
+        assertFalse((Boolean) detail.get("hasMore"));
+    }
+
+    private ExploreTopicItem topicItem(String articleRevisionId, String articleId, int sortNo,
+                                       String title) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("schemaVersion", 1);
+        snapshot.put("itemType", "ARTICLE");
+        snapshot.put("articleId", articleId);
+        snapshot.put("title", title);
+        return ExploreTopicItem.builder()
+                .topicRevisionId("tr_01")
+                .articleRevisionId(articleRevisionId)
+                .sortNo(sortNo)
+                .displaySnapshot(snapshot)
+                .build();
     }
 
     private void stubCurrentPage() {

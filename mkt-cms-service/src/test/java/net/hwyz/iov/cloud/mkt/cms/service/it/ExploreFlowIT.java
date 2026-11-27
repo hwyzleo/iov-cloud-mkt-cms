@@ -306,8 +306,13 @@ class ExploreFlowIT {
 
         Map<String, Object> topicDetail = mobileQueryAppService.topicDetail(
                 topic.getTopic().getTopicId(), topic.getRevision().getRevisionId(), null, 10);
-        assertEquals(1, ((List<?>) topicDetail.get("items")).size());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> topicItems = (List<Map<String, Object>>) topicDetail.get("items");
+        assertEquals(1, topicItems.size());
         assertEquals("专题一", topicDetail.get("name"));
+        assertEquals(articles.get(0).getRevision().getRevisionId(), topicItems.get(0).get("itemId"));
+        assertEquals("ARTICLE", topicItems.get(0).get("itemType"));
+        assertEquals(10, topicItems.get(0).get("sortNo"));
 
         ExploreException changed = assertThrows(ExploreException.class,
                 () -> mobileQueryAppService.articleFeed(CHANNEL, feed.getComponentId(),
