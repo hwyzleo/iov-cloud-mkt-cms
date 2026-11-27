@@ -37,6 +37,12 @@ public class ExploreChannelPo implements Serializable {
     @TableField("status")
     private String status;
 
+    @TableField("draft_revision_id")
+    private String draftRevisionId;
+
+    @TableField("current_revision_id")
+    private String currentRevisionId;
+
     @TableField("lock_version")
     private Integer lockVersion;
 

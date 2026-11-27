@@ -582,6 +582,79 @@ class ExploreFlowIT {
         assertEquals(ExploreErrorCode.EXPLORE_VERSION_CONFLICT, conflict.getErrorCode());
     }
 
+    @Test
+    @DisplayName("AT-028/AT-029：专题封面独立、详情可见子集与旧页面快照不变")
+    void 专题详情可见子集与页面快照() {
+        ExploreArticleView article = publishedArticle("详情图集文章", "<p>正文</p>");
+        ExploreImage coverOnly = testImage("https://assets.example/cover.png", "image/png")
+                .toBuilder().showInDetail(false).build();
+        ExploreImage detail = testImage("https://assets.example/detail.png", "image/png")
+                .toBuilder().showInDetail(true).build();
+        ExploreTopicView created = topicAppService.create(ExploreTopicCmd.builder()
+                .name("详情子集专题")
+                .summary("摘要")
+                .images(List.of(coverOnly, detail))
+                .articleRevisionIds(List.of(article.getRevision().getRevisionId()))
+                .operator(OPERATOR)
+                .build());
+        ExploreTopicView published = topicAppService.publish(ExploreContentPublishCmd.builder()
+                .objectId(created.getTopic().getTopicId()).operator(OPERATOR).build());
+        String topicId = published.getTopic().getTopicId();
+
+        savePage(0, List.of(topicComponent(published)));
+        publishPage("req-topic-detail-1", null, "IMMEDIATE", null, null);
+
+        Map<String, Object> snapshot = topicItemSnapshot();
+        assertEquals(1, snapshot.get("imageCount"));
+        assertEquals("SINGLE", snapshot.get("imageLayout"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cover = (Map<String, Object>) snapshot.get("cover");
+        assertEquals("https://assets.example/cover.png", cover.get("url"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> images = (List<Map<String, Object>>) snapshot.get("images");
+        assertEquals(1, images.size());
+        assertEquals("https://assets.example/detail.png", images.get(0).get("url"));
+
+        ExploreTopicView admin = topicAppService.get(topicId);
+        assertEquals(2, admin.getRevision().getImages().size());
+        assertFalse(admin.getRevision().getImages().get(0).detailVisible());
+
+        ExploreTopicView nextDraft = topicAppService.update(ExploreTopicCmd.builder()
+                .topicId(topicId)
+                .name("详情子集专题")
+                .summary("摘要")
+                .images(List.of(testImage("https://assets.example/only.png", "image/png")))
+                .articleRevisionIds(List.of(article.getRevision().getRevisionId()))
+                .lockVersion(published.getTopic().getLockVersion())
+                .operator(OPERATOR)
+                .build());
+        ExploreTopicView nextPublished = topicAppService.publish(ExploreContentPublishCmd.builder()
+                .objectId(topicId).operator(OPERATOR).build());
+        assertEquals(nextDraft.getRevision().getRevisionId(),
+                nextPublished.getRevision().getRevisionId());
+
+        Map<String, Object> unchanged = topicItemSnapshot();
+        assertEquals(1, unchanged.get("imageCount"), "旧页面发布快照不得被新专题修订改写");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> unchangedCover = (Map<String, Object>) unchanged.get("cover");
+        assertEquals("https://assets.example/cover.png", unchangedCover.get("url"));
+
+        Map<String, Object> newDetail = mobileQueryAppService.topicDetail(topicId,
+                nextPublished.getRevision().getRevisionId(), null, 10);
+        assertEquals(1, newDetail.get("imageCount"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> newImages = (List<Map<String, Object>>) newDetail.get("images");
+        assertEquals("https://assets.example/only.png", newImages.get(0).get("url"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> topicItemSnapshot() {
+        ExplorePageView page = mobileQueryAppService.currentPage(CHANNEL, 10);
+        ExploreComponentView topics = page.getComponents().stream()
+                .filter(component -> "TOPIC_GRID".equals(component.getType())).findFirst().orElseThrow();
+        return (Map<String, Object>) topics.getItems().get(0);
+    }
+
     private ExploreImage testImage(String url, String mime) {
         return ExploreImage.builder()
                 .url(url)

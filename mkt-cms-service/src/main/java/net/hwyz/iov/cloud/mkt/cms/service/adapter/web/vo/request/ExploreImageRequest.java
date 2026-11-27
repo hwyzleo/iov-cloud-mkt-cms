@@ -26,4 +26,9 @@ public class ExploreImageRequest {
 
     @NotNull(message = "图片大小不能为空")
     private Long size;
+
+    /**
+     * 是否进入详情图集；仅专题图片使用，缺省 true
+     */
+    private Boolean showInDetail;
 }

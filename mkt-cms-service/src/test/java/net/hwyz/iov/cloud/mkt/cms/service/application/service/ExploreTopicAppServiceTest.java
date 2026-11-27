@@ -39,10 +39,12 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -192,6 +194,29 @@ class ExploreTopicAppServiceTest {
     }
 
     @Test
+    @DisplayName("showInDetail 缺省归一为 true，仅标志变化也改变 contentHash")
+    void 详情可见标志归一与哈希() {
+        topicAppService.update(cmd(null, List.of(image("a.png")), List.of()));
+        topicAppService.update(cmd(null, List.of(imageWithDetail("a.png", false)), List.of()));
+
+        List<ExploreTopicRevision> revisions = captureInsertedRevision(2);
+        assertTrue(revisions.get(0).getImages().get(0).detailVisible(), "缺省应为详情可见");
+        assertFalse(revisions.get(1).getImages().get(0).detailVisible(), "显式 false 应保留");
+        assertNotEquals(revisions.get(0).getContentHash(), revisions.get(1).getContentHash(),
+                "仅 showInDetail 变化必须改变 contentHash");
+    }
+
+    @Test
+    @DisplayName("显式 showInDetail=true 与缺省 true 产生相同 contentHash")
+    void 详情可见标志幂等哈希() {
+        topicAppService.update(cmd(null, List.of(image("a.png")), List.of()));
+        topicAppService.update(cmd(null, List.of(imageWithDetail("a.png", true)), List.of()));
+
+        List<ExploreTopicRevision> revisions = captureInsertedRevision(2);
+        assertEquals(revisions.get(0).getContentHash(), revisions.get(1).getContentHash());
+    }
+
+    @Test
     @DisplayName("发布门禁拦截历史非法草稿（非专题详情模式 + 已有文章条目）")
     void 发布门禁拦截非法草稿() {
         stubPublishedArticle("arv_1", "at_1");
@@ -337,5 +362,9 @@ class ExploreTopicAppServiceTest {
                 .mime("image/png")
                 .size(2048L)
                 .build();
+    }
+
+    private ExploreImage imageWithDetail(String fileName, boolean showInDetail) {
+        return image(fileName).toBuilder().showInDetail(showInDetail).build();
     }
 }

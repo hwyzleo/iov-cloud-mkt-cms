@@ -42,4 +42,7 @@ public class ExploreTopicImagePo implements Serializable {
 
     @TableField("size")
     private Long size;
+
+    @TableField("show_in_detail")
+    private Boolean showInDetail;
 }

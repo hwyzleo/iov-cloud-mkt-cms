@@ -15,6 +15,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticleRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBanner;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannel;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannelRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreComponentView;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreCursor;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
@@ -31,6 +32,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExplorePageRepositor
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreTopicRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ExploreCursorCodec;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ExploreImageLayout;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.service.ExploreTopicGallery;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.config.ExploreProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -272,14 +274,15 @@ public class ExploreMobileQueryAppService {
         view.put("revisionId", revision.getRevisionId());
         view.put("name", revision.getName());
         view.put("summary", revision.getSummary());
-        List<ExploreImage> images = topicRepository.findRevisionImages(revision.getRevisionId());
-        if (images.isEmpty() && revision.getCover() != null) {
-            images = List.of(revision.getCover());
+        List<ExploreImage> allImages = topicRepository.findRevisionImages(revision.getRevisionId());
+        if (allImages.isEmpty() && revision.getCover() != null) {
+            allImages = List.of(revision.getCover());
         }
-        view.put("cover", imageView(images.isEmpty() ? null : images.get(0)));
-        view.put("images", images.stream().map(this::imageView).toList());
-        view.put("imageCount", images.size());
-        view.put("imageLayout", ExploreImageLayout.of(images.size()));
+        List<ExploreImage> detailImages = ExploreTopicGallery.detailImages(allImages);
+        view.put("cover", imageView(ExploreTopicGallery.cover(allImages)));
+        view.put("images", detailImages.stream().map(this::imageView).toList());
+        view.put("imageCount", detailImages.size());
+        view.put("imageLayout", ExploreImageLayout.of(detailImages.size()));
         view.put("target", revision.getTarget() == null ? Map.of() : revision.getTarget().toView());
         view.put("items", visible.stream().map(ExploreTopicItem::displayView).toList());
         view.put("hasMore", hasMore);
@@ -329,10 +332,18 @@ public class ExploreMobileQueryAppService {
         ExploreChannel channel = channelRepository.findByCode(channelCode)
                 .orElseThrow(() -> new ExploreException(ExploreErrorCode.EXPLORE_PAGE_NOT_FOUND,
                         "频道不存在: " + channelCode));
-        if (channel.getStatus() != ExploreChannelStatus.ENABLED) {
+        ExploreChannelRevision published = channelRepository.findCurrentPublishedRevision(channelCode)
+                .orElseThrow(() -> new ExploreException(ExploreErrorCode.EXPLORE_PAGE_NOT_FOUND,
+                        "频道尚无已发布配置: " + channelCode));
+        if (published.getStatus() != ExploreChannelStatus.ENABLED) {
             throw new ExploreException(ExploreErrorCode.EXPLORE_PAGE_NOT_FOUND, "频道未启用");
         }
-        return channel;
+        return channel.toBuilder()
+                .name(published.getName())
+                .sortNo(published.getSortNo())
+                .status(published.getStatus())
+                .currentRevisionId(published.getRevisionId())
+                .build();
     }
 
     private ExplorePage requireCurrentPage(String channelCode, Instant now) {

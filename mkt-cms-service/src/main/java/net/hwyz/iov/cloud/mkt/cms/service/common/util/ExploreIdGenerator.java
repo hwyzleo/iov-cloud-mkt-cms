@@ -92,4 +92,11 @@ public final class ExploreIdGenerator {
     public static String operationId() {
         return "eop_" + IdUtil.nanoId(RANDOM_LENGTH);
     }
+
+    /**
+     * 频道配置修订标识（ecr_）
+     */
+    public static String channelRevisionId() {
+        return "ecr_" + IdUtil.nanoId(RANDOM_LENGTH);
+    }
 }

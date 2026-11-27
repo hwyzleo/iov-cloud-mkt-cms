@@ -8,7 +8,8 @@ import java.util.Set;
  * 探索页预置频道编码。
  * <p>
  * MKT-CMS-DSN-CR-003 §4.1 / AC-029：首版通过迁移预置 RECOMMEND / ACTIVITY / LOCAL；
- * 编码稳定，名称、排序与状态可维护，被引用后不得修改或删除。
+ * MKT-CMS-DSN-CR-005 §3.3 / AC-068：编码仅作为预置数据常量保留，不再构成可创建频道白名单；
+ * 新增频道由运营按编码规则创建，编码稳定、创建后不可变。
  *
  * @author hwyz_leo
  */

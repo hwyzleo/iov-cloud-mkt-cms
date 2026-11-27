@@ -10,6 +10,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreContentStatus;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreRevisionStatus;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannel;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannelRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePageComponent;
@@ -192,6 +193,66 @@ class ExploreMobileQueryAppServiceTest {
         assertFalse((Boolean) detail.get("hasMore"));
     }
 
+    @Test
+    @DisplayName("专题详情 images/imageCount/imageLayout 只按 showInDetail=true 子集计算")
+    void 专题详情仅返回详情可见子集() {
+        stubPublishedTopicRevision();
+        when(topicRepository.findRevisionImages("tr_01")).thenReturn(List.of(
+                image("a.png"),
+                image("b.png").toBuilder().showInDetail(false).build(),
+                image("c.png").toBuilder().showInDetail(true).build()));
+        when(topicRepository.listItemsAfter("tr_01", null, 11)).thenReturn(List.of());
+
+        Map<String, Object> detail = mobileQueryAppService.topicDetail("tp_01", "tr_01", null, 10);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> images = (List<Map<String, Object>>) detail.get("images");
+        assertEquals(2, images.size());
+        assertEquals("https://assets.example/a.png", images.get(0).get("url"));
+        assertEquals("https://assets.example/c.png", images.get(1).get("url"));
+        assertEquals(2, detail.get("imageCount"));
+        assertEquals("TWO_COLUMNS", detail.get("imageLayout"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cover = (Map<String, Object>) detail.get("cover");
+        assertEquals("https://assets.example/a.png", cover.get("url"));
+    }
+
+    @Test
+    @DisplayName("全部图片 showInDetail=false 时详情显式为空，不回退封面")
+    void 详情全隐藏时为空集合() {
+        stubPublishedTopicRevision();
+        when(topicRepository.findRevisionImages("tr_01")).thenReturn(List.of(
+                image("a.png").toBuilder().showInDetail(false).build(),
+                image("b.png").toBuilder().showInDetail(false).build()));
+        when(topicRepository.listItemsAfter("tr_01", null, 11)).thenReturn(List.of());
+
+        Map<String, Object> detail = mobileQueryAppService.topicDetail("tp_01", "tr_01", null, 10);
+
+        assertEquals(0, detail.get("imageCount"));
+        assertEquals("SINGLE", detail.get("imageLayout"));
+        assertEquals(List.of(), detail.get("images"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cover = (Map<String, Object>) detail.get("cover");
+        assertEquals("https://assets.example/a.png", cover.get("url"));
+    }
+
+    private void stubPublishedTopicRevision() {
+        when(topicRepository.findByTopicId("tp_01")).thenReturn(Optional.of(ExploreTopic.builder()
+                .topicId("tp_01")
+                .status(ExploreContentStatus.PUBLISHED)
+                .currentRevisionId("tr_01")
+                .lockVersion(1)
+                .build()));
+        when(topicRepository.findRevision("tr_01")).thenReturn(Optional.of(ExploreTopicRevision.builder()
+                .revisionId("tr_01")
+                .topicId("tp_01")
+                .revisionNo(1)
+                .status(ExploreRevisionStatus.PUBLISHED)
+                .name("专题")
+                .summary("摘要")
+                .build()));
+    }
+
     private ExploreTopicItem topicItem(String articleRevisionId, String articleId, int sortNo,
                                        String title) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
@@ -212,6 +273,16 @@ class ExploreMobileQueryAppServiceTest {
                 .channelCode("RECOMMEND")
                 .status(ExploreChannelStatus.ENABLED)
                 .build()));
+        when(channelRepository.findCurrentPublishedRevision("RECOMMEND"))
+                .thenReturn(Optional.of(ExploreChannelRevision.builder()
+                        .revisionId("ecr_01")
+                        .channelCode("RECOMMEND")
+                        .revisionNo(1)
+                        .name("推荐")
+                        .sortNo(10)
+                        .status(ExploreChannelStatus.ENABLED)
+                        .revisionStatus(ExploreRevisionStatus.PUBLISHED)
+                        .build()));
         when(pageRepository.findCurrentPage("RECOMMEND")).thenReturn(Optional.of(ExplorePage.builder()
                 .pageId("er_01")
                 .channelCode("RECOMMEND")

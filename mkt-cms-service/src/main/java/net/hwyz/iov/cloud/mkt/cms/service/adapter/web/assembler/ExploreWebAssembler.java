@@ -2,6 +2,8 @@ package net.hwyz.iov.cloud.mkt.cms.service.adapter.web.assembler;
 
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreArticleRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreBannerRequest;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreChannelCreateRequest;
+import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreChannelPublishRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreChannelUpdateRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreContentPublishRequest;
 import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreImageRequest;
@@ -12,12 +14,14 @@ import net.hwyz.iov.cloud.mkt.cms.service.adapter.web.vo.request.ExploreTopicReq
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExploreArticleCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExploreBannerCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExploreChannelCmd;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExploreChannelPublishCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExploreContentPublishCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExplorePagePublishCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExplorePageSaveCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.cmd.ExploreTopicCmd;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExploreArticleView;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExploreBannerView;
+import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExploreChannelView;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExploreComponentData;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExplorePageData;
 import net.hwyz.iov.cloud.mkt.cms.service.application.dto.result.ExplorePublishResult;
@@ -28,7 +32,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticleRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBanner;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBannerRevision;
-import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannel;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannelRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePageItem;
@@ -64,6 +68,28 @@ public final class ExploreWebAssembler {
                 .name(request.getName())
                 .sortNo(request.getSortNo())
                 .status(request.getStatus())
+                .lockVersion(request.getLockVersion())
+                .operator(operator)
+                .build();
+    }
+
+    public static ExploreChannelCmd toCreateCmd(ExploreChannelCreateRequest request, String operator) {
+        return ExploreChannelCmd.builder()
+                .channelCode(request.getChannelCode())
+                .name(request.getName())
+                .sortNo(request.getSortNo())
+                .status(request.getStatus())
+                .operator(operator)
+                .build();
+    }
+
+    public static ExploreChannelPublishCmd toChannelPublishCmd(String channelCode,
+                                                               ExploreChannelPublishRequest request,
+                                                               String operator) {
+        return ExploreChannelPublishCmd.builder()
+                .channelCode(channelCode)
+                .requestId(request.getRequestId())
+                .expectedCurrentRevisionId(request.getExpectedCurrentRevisionId())
                 .lockVersion(request.getLockVersion())
                 .operator(operator)
                 .build();
@@ -183,6 +209,7 @@ public final class ExploreWebAssembler {
                 .height(request.getHeight())
                 .mime(request.getMime())
                 .size(request.getSize())
+                .showInDetail(request.getShowInDetail())
                 .build();
     }
 
@@ -203,14 +230,32 @@ public final class ExploreWebAssembler {
                 .build();
     }
 
-    public static Map<String, Object> toChannelView(ExploreChannel channel) {
+    public static Map<String, Object> toChannelView(ExploreChannelView data) {
         Map<String, Object> view = new LinkedHashMap<>();
-        view.put("channelCode", channel.getChannelCode());
-        view.put("name", channel.getName());
-        view.put("sortNo", channel.getSortNo());
-        view.put("status", channel.getStatus() == null ? null : channel.getStatus().name());
-        view.put("lockVersion", channel.getLockVersion());
-        view.put("updatedAt", iso(channel.getModifyTime()));
+        view.put("channelCode", data.getChannelCode());
+        view.put("draft", channelRevisionView(data.getDraft()));
+        view.put("published", channelRevisionView(data.getPublished()));
+        view.put("hasUnpublishedChanges", data.isHasUnpublishedChanges());
+        view.put("deletable", data.isDeletable());
+        view.put("lockVersion", data.getLockVersion());
+        // 兼容页面编排频道下拉：展示当前发布配置，无发布时回退草稿
+        ExploreChannelRevision display = data.getPublished() != null ? data.getPublished() : data.getDraft();
+        view.put("name", display == null ? null : display.getName());
+        view.put("sortNo", display == null ? null : display.getSortNo());
+        view.put("status", display == null || display.getStatus() == null
+                ? null : display.getStatus().name());
+        return view;
+    }
+
+    private static Map<String, Object> channelRevisionView(ExploreChannelRevision revision) {
+        if (revision == null) {
+            return null;
+        }
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("revisionId", revision.getRevisionId());
+        view.put("name", revision.getName());
+        view.put("sortNo", revision.getSortNo());
+        view.put("status", revision.getStatus() == null ? null : revision.getStatus().name());
         return view;
     }
 
@@ -337,7 +382,7 @@ public final class ExploreWebAssembler {
         view.put("summary", revision == null ? null : revision.getSummary());
         List<ExploreImage> images = topicImages(revision);
         view.put("cover", image(images.isEmpty() ? null : images.get(0)));
-        view.put("images", images.stream().map(ExploreWebAssembler::image).toList());
+        view.put("images", images.stream().map(ExploreWebAssembler::topicImage).toList());
         view.put("imageCount", images.size());
         view.put("imageLayout", ExploreImageLayout.of(images.size()));
         view.put("target", revision == null || revision.getTarget() == null
@@ -446,6 +491,20 @@ public final class ExploreWebAssembler {
         view.put("height", image.getHeight());
         view.put("mime", image.getMime());
         view.put("size", image.getSize());
+        return view;
+    }
+
+    /**
+     * 专题图集项：管理视图返回完整图集及每图详情可见标志
+     *
+     * @param image 图片
+     * @return 图集项
+     */
+    private static Map<String, Object> topicImage(ExploreImage image) {
+        Map<String, Object> view = image(image);
+        if (view != null) {
+            view.put("showInDetail", image.detailVisible());
+        }
         return view;
     }
 

@@ -63,7 +63,22 @@ public enum ExploreAction {
     COPY_TO_DRAFT,
 
     /**
-     * 修改频道
+     * 修改频道草稿
      */
-    UPDATE_CHANNEL
+    UPDATE_CHANNEL,
+
+    /**
+     * 新增频道
+     */
+    CREATE_CHANNEL,
+
+    /**
+     * 删除未被引用的频道
+     */
+    DELETE_CHANNEL,
+
+    /**
+     * 独立发布频道配置（不影响页面发布）
+     */
+    PUBLISH_CHANNEL
 }

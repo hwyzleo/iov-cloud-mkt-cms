@@ -14,6 +14,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticleRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBanner;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBannerRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannel;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannelRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreOperation;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePage;
@@ -29,6 +30,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreA
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreBannerPo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreBannerRevisionPo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreChannelPo;
+import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreChannelRevisionPo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreOperationPo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExplorePageComponentPo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExplorePageCurrentPo;
@@ -62,6 +64,8 @@ public final class ExploreConverter {
         po.setName(domain.getName());
         po.setSortNo(domain.getSortNo());
         po.setStatus(domain.getStatus() == null ? null : domain.getStatus().name());
+        po.setDraftRevisionId(domain.getDraftRevisionId());
+        po.setCurrentRevisionId(domain.getCurrentRevisionId());
         po.setLockVersion(domain.getLockVersion());
         po.setCreateBy(domain.getCreateBy());
         po.setCreateTime(domain.getCreateTime());
@@ -77,7 +81,55 @@ public final class ExploreConverter {
                 .name(po.getName())
                 .sortNo(po.getSortNo() == null ? 0 : po.getSortNo())
                 .status(po.getStatus() == null ? null : ExploreChannelStatus.valueOf(po.getStatus()))
+                .draftRevisionId(po.getDraftRevisionId())
+                .currentRevisionId(po.getCurrentRevisionId())
                 .lockVersion(po.getLockVersion() == null ? 0 : po.getLockVersion())
+                .createBy(po.getCreateBy())
+                .createTime(po.getCreateTime())
+                .modifyBy(po.getModifyBy())
+                .modifyTime(po.getModifyTime())
+                .build();
+    }
+
+    public static ExploreChannelRevisionPo fromDomain(ExploreChannelRevision domain) {
+        ExploreChannelRevisionPo po = new ExploreChannelRevisionPo();
+        po.setId(domain.getId());
+        po.setRevisionId(domain.getRevisionId());
+        po.setChannelCode(domain.getChannelCode());
+        po.setRevisionNo(domain.getRevisionNo());
+        po.setName(domain.getName());
+        po.setSortNo(domain.getSortNo());
+        po.setStatus(domain.getStatus() == null ? null : domain.getStatus().name());
+        po.setRevisionStatus(domain.getRevisionStatus() == null ? null : domain.getRevisionStatus().name());
+        po.setContentHash(domain.getContentHash());
+        po.setPublishedBy(domain.getPublishedBy());
+        po.setPublishedAt(domain.getPublishedAt());
+        po.setRequestId(domain.getRequestId());
+        po.setRequestHash(domain.getRequestHash());
+        po.setExpectedCurrentRevisionId(domain.getExpectedCurrentRevisionId());
+        po.setCreateBy(domain.getCreateBy());
+        po.setCreateTime(domain.getCreateTime());
+        po.setModifyBy(domain.getModifyBy());
+        po.setModifyTime(domain.getModifyTime());
+        return po;
+    }
+
+    public static ExploreChannelRevision toDomain(ExploreChannelRevisionPo po) {
+        return ExploreChannelRevision.builder()
+                .id(po.getId())
+                .revisionId(po.getRevisionId())
+                .channelCode(po.getChannelCode())
+                .revisionNo(po.getRevisionNo() == null ? 0 : po.getRevisionNo())
+                .name(po.getName())
+                .sortNo(po.getSortNo() == null ? 0 : po.getSortNo())
+                .status(po.getStatus() == null ? null : ExploreChannelStatus.valueOf(po.getStatus()))
+                .revisionStatus(ExploreRevisionStatus.valueOf(po.getRevisionStatus()))
+                .contentHash(po.getContentHash())
+                .publishedBy(po.getPublishedBy())
+                .publishedAt(po.getPublishedAt())
+                .requestId(po.getRequestId())
+                .requestHash(po.getRequestHash())
+                .expectedCurrentRevisionId(po.getExpectedCurrentRevisionId())
                 .createBy(po.getCreateBy())
                 .createTime(po.getCreateTime())
                 .modifyBy(po.getModifyBy())

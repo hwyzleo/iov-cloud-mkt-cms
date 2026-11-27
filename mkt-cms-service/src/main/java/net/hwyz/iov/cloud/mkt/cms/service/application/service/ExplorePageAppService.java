@@ -16,6 +16,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.common.util.ExploreGuard;
 import net.hwyz.iov.cloud.mkt.cms.service.common.util.ExploreIdGenerator;
 import net.hwyz.iov.cloud.mkt.cms.service.common.util.TraceContext;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannel;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannelRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreComponentView;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreOperation;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePage;
@@ -135,6 +136,9 @@ public class ExplorePageAppService {
             throw new ExploreException(ExploreErrorCode.EXPLORE_PAGE_NOT_FOUND, "仅草稿页面支持预览");
         }
         ExploreChannel channel = requireChannel(page.getChannelCode());
+        String channelName = channelRepository.findCurrentPublishedRevision(channel.getChannelCode())
+                .map(ExploreChannelRevision::getName)
+                .orElse(channel.getName());
         List<ExploreComponentView> components = new ArrayList<>();
         for (ExploreComponentData data : contentService.load(page.getPageId())) {
             components.add(ExploreComponentView.builder()
@@ -148,7 +152,7 @@ public class ExplorePageAppService {
         }
         return ExplorePageView.builder()
                 .channelCode(channel.getChannelCode())
-                .channelName(channel.getName())
+                .channelName(channelName)
                 .releaseId(page.getPageId())
                 .preview(true)
                 .components(components)

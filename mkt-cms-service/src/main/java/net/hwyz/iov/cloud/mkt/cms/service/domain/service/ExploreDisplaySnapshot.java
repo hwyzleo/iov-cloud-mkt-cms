@@ -85,6 +85,9 @@ public final class ExploreDisplaySnapshot {
 
     /**
      * 专题卡片快照（MKT-CMS-DSN-CR-004 §4.1：图集 + 已解析跳转目标）
+     * <p>
+     * MKT-CMS-DSN-CR-005 §5.2：封面始终取完整图集首图，images/imageCount/imageLayout
+     * 只描述 showInDetail=true 的详情子集；显式空子集不得回退封面。
      *
      * @param topicId    专题标识
      * @param revisionId 修订标识
@@ -102,11 +105,11 @@ public final class ExploreDisplaySnapshot {
         snapshot.put("revisionId", revisionId);
         snapshot.put("name", name);
         snapshot.put("summary", summary);
-        List<ExploreImage> safeImages = images == null ? List.of() : images;
-        putImage(snapshot, "cover", safeImages.isEmpty() ? null : safeImages.get(0));
-        snapshot.put("images", safeImages.stream().map(ExploreDisplaySnapshot::imageView).toList());
-        snapshot.put("imageCount", safeImages.size());
-        snapshot.put("imageLayout", ExploreImageLayout.of(safeImages.size()));
+        putImage(snapshot, "cover", ExploreTopicGallery.cover(images));
+        List<ExploreImage> detailImages = ExploreTopicGallery.detailImages(images);
+        snapshot.put("images", detailImages.stream().map(ExploreDisplaySnapshot::imageView).toList());
+        snapshot.put("imageCount", detailImages.size());
+        snapshot.put("imageLayout", ExploreImageLayout.of(detailImages.size()));
         snapshot.put("target", target == null ? topicTarget(topicId, revisionId) : target.toView());
         return snapshot;
     }

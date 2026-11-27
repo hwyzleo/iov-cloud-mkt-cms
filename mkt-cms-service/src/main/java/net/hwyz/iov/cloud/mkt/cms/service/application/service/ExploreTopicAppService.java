@@ -382,6 +382,7 @@ public class ExploreTopicAppService {
             view.put("height", image.getHeight());
             view.put("mime", image.getMime());
             view.put("size", image.getSize());
+            view.put("showInDetail", image.detailVisible());
             payload.add(view);
         }
         return payload;
@@ -412,7 +413,11 @@ public class ExploreTopicAppService {
             }
             mediaValidator.validateRequiredImage(image, "第 " + (index + 1) + " 张图片");
         }
-        return List.copyOf(images);
+        List<ExploreImage> normalized = new ArrayList<>();
+        for (ExploreImage image : images) {
+            normalized.add(image.toBuilder().showInDetail(image.detailVisible()).build());
+        }
+        return List.copyOf(normalized);
     }
 
     /**

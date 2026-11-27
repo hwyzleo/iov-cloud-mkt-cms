@@ -179,6 +179,50 @@ class ExplorePageContentServiceTest {
                 .build();
     }
 
+    @Test
+    @DisplayName("专题展示快照按详情子集计算数量与布局，封面仍取完整首图")
+    void 专题快照详情子集() {
+        stubTopic(topic(null));
+        when(topicRepository.findRevisionImages("tr_01")).thenReturn(List.of(
+                image("a.png"),
+                image("b.png").toBuilder().showInDetail(false).build(),
+                image("c.png").toBuilder().showInDetail(true).build()));
+
+        ExplorePageContentService.Resolved resolved = contentService.resolve(
+                ExploreItemType.TOPIC, "tp_01", "tr_01", true);
+
+        Map<String, Object> snapshot = resolved.snapshot();
+        assertEquals(2, snapshot.get("imageCount"));
+        assertEquals("TWO_COLUMNS", snapshot.get("imageLayout"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> images = (List<Map<String, Object>>) snapshot.get("images");
+        assertEquals(2, images.size());
+        assertEquals("https://assets.example/a.png", images.get(0).get("url"));
+        assertEquals("https://assets.example/c.png", images.get(1).get("url"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cover = (Map<String, Object>) snapshot.get("cover");
+        assertEquals("https://assets.example/a.png", cover.get("url"));
+    }
+
+    @Test
+    @DisplayName("专题详情全部隐藏时快照显式空集合，不回退封面")
+    void 专题快照详情全隐藏() {
+        stubTopic(topic(null));
+        when(topicRepository.findRevisionImages("tr_01")).thenReturn(List.of(
+                image("a.png").toBuilder().showInDetail(false).build()));
+
+        ExplorePageContentService.Resolved resolved = contentService.resolve(
+                ExploreItemType.TOPIC, "tp_01", "tr_01", true);
+
+        Map<String, Object> snapshot = resolved.snapshot();
+        assertEquals(0, snapshot.get("imageCount"));
+        assertEquals("SINGLE", snapshot.get("imageLayout"));
+        assertEquals(List.of(), snapshot.get("images"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cover = (Map<String, Object>) snapshot.get("cover");
+        assertEquals("https://assets.example/a.png", cover.get("url"));
+    }
+
     private ExploreImage image(String fileName) {
         return ExploreImage.builder()
                 .url("https://assets.example/" + fileName)

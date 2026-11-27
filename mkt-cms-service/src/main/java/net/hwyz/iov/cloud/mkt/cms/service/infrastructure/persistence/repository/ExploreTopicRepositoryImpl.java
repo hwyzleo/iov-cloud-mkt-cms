@@ -221,6 +221,7 @@ public class ExploreTopicRepositoryImpl implements ExploreTopicRepository {
             po.setHeight(image.getHeight());
             po.setMime(image.getMime());
             po.setSize(image.getSize());
+            po.setShowInDetail(image.detailVisible());
             imageMapper.insert(po);
             sortNo += 10;
         }
@@ -257,6 +258,7 @@ public class ExploreTopicRepositoryImpl implements ExploreTopicRepository {
                 .height(po.getHeight())
                 .mime(po.getMime())
                 .size(po.getSize())
+                .showInDetail(po.getShowInDetail() == null || po.getShowInDetail())
                 .build();
     }
 }
