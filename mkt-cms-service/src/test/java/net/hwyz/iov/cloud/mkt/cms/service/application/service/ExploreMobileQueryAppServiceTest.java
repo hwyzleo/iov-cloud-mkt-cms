@@ -6,9 +6,14 @@ import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreComponentType;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExplorePageStatus;
 import net.hwyz.iov.cloud.mkt.cms.service.common.exception.ExploreErrorCode;
 import net.hwyz.iov.cloud.mkt.cms.service.common.exception.ExploreException;
+import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreContentStatus;
+import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreRevisionStatus;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreChannel;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePageComponent;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopic;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopicRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreArticleRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreBannerRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreChannelRepository;
@@ -109,6 +114,41 @@ class ExploreMobileQueryAppServiceTest {
         verify(pageRepository, never()).feedPage(anyString(), any(), any(), anyInt());
     }
 
+    @Test
+    @DisplayName("专题详情返回图集、数量与布局，封面取首图")
+    void 专题详情图集契约() {
+        when(topicRepository.findByTopicId("tp_01")).thenReturn(Optional.of(ExploreTopic.builder()
+                .topicId("tp_01")
+                .status(ExploreContentStatus.PUBLISHED)
+                .currentRevisionId("tr_01")
+                .lockVersion(1)
+                .build()));
+        when(topicRepository.findRevision("tr_01")).thenReturn(Optional.of(ExploreTopicRevision.builder()
+                .revisionId("tr_01")
+                .topicId("tp_01")
+                .revisionNo(1)
+                .status(ExploreRevisionStatus.PUBLISHED)
+                .name("专题")
+                .summary("摘要")
+                .build()));
+        when(topicRepository.findRevisionImages("tr_01"))
+                .thenReturn(List.of(image("a.png"), image("b.png"), image("c.png")));
+        when(topicRepository.listItemsAfter("tr_01", null, 11)).thenReturn(List.of());
+
+        Map<String, Object> detail = mobileQueryAppService.topicDetail("tp_01", "tr_01", null, 10);
+
+        assertEquals(3, detail.get("imageCount"));
+        assertEquals("ONE_LARGE_TWO_SMALL", detail.get("imageLayout"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> images = (List<Map<String, Object>>) detail.get("images");
+        assertEquals(3, images.size());
+        assertEquals("https://assets.example/a.png", images.get(0).get("url"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cover = (Map<String, Object>) detail.get("cover");
+        assertEquals("https://assets.example/a.png", cover.get("url"));
+        assertFalse((Boolean) detail.get("hasMore"));
+    }
+
     private void stubCurrentPage() {
         when(channelRepository.findByCode("RECOMMEND")).thenReturn(Optional.of(ExploreChannel.builder()
                 .channelCode("RECOMMEND")
@@ -129,5 +169,15 @@ class ExploreMobileQueryAppServiceTest {
                 .componentType(type)
                 .config(Map.of())
                 .build(), List.of());
+    }
+
+    private ExploreImage image(String fileName) {
+        return ExploreImage.builder()
+                .url("https://assets.example/" + fileName)
+                .width(1600)
+                .height(900)
+                .mime("image/png")
+                .size(2048L)
+                .build();
     }
 }

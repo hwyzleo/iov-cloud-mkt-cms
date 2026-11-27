@@ -14,6 +14,7 @@ import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticle;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreArticleRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBanner;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreBannerRevision;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePageComponent;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExplorePageItem;
@@ -198,14 +199,19 @@ public class ExplorePageContentService {
                         .orElseThrow(() -> new ExploreException(ExploreErrorCode.EXPLORE_CONTENT_NOT_FOUND,
                                 "页面条目专题不存在: " + refId));
                 requireVisible(requireVisible, topic.getStatus(), refId);
+                List<ExploreImage> images = topicRepository.findRevisionImages(refRevisionId);
+                if (images.isEmpty() && revision.getCover() != null) {
+                    images = List.of(revision.getCover());
+                }
+                ExploreTarget resolved = targetAppService.normalizeTopicTarget(topic.getTopicId(),
+                        revision.getTarget());
+                ExploreTarget finalTarget = resolved == null
+                        ? targetAppService.topicDetailTarget(topic.getTopicId(), revision.getRevisionId())
+                        : resolved;
                 Map<String, Object> snapshot = ExploreDisplaySnapshot.topic(
                         topic.getTopicId(), revision.getRevisionId(), revision.getName(),
-                        revision.getSummary(), revision.getCover());
-                return new Resolved(ExploreTarget.builder()
-                        .type(ExploreTargetType.TOPIC)
-                        .refId(topic.getTopicId())
-                        .revisionId(revision.getRevisionId())
-                        .build(), snapshot);
+                        revision.getSummary(), images, finalTarget);
+                return new Resolved(finalTarget, snapshot);
             }
             case BANNER -> {
                 ExploreBannerRevision revision = bannerRepository.findRevision(refRevisionId)

@@ -1,11 +1,14 @@
 package net.hwyz.iov.cloud.mkt.cms.service.domain.repository;
 
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreContentSearchCriteria;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopic;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopicItem;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopicRevision;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -50,6 +53,30 @@ public interface ExploreTopicRepository {
      * @return 条目列表
      */
     List<ExploreTopicItem> listItemsAfter(String topicRevisionId, Integer lastSortNo, int limit);
+
+    /**
+     * 替换专题修订图集（草稿修订专用；已发布修订不可改删）
+     *
+     * @param topicRevisionId 专题修订标识
+     * @param images          有序图集
+     */
+    void replaceRevisionImages(String topicRevisionId, List<ExploreImage> images);
+
+    /**
+     * 查询专题修订图集
+     *
+     * @param topicRevisionId 专题修订标识
+     * @return 有序图集
+     */
+    List<ExploreImage> findRevisionImages(String topicRevisionId);
+
+    /**
+     * 批量查询专题修订图集
+     *
+     * @param topicRevisionIds 专题修订标识集合
+     * @return 修订标识 → 有序图集
+     */
+    Map<String, List<ExploreImage>> findRevisionImagesByIds(Collection<String> topicRevisionIds);
 
     /**
      * 批量查询专题根实体

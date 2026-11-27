@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreRevisionStatus;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 探索页专题修订（不可变快照）。
@@ -35,6 +36,14 @@ public class ExploreTopicRevision {
 
     private ExploreImage cover;
 
+    /**
+     * 有序图集（MKT-CMS-DSN-CR-004 §5.1：最多 9 张，cover 为 images[0]）
+     */
+    private List<ExploreImage> images;
+
+    /**
+     * 跳转目标；为空表示专题详情模式（打开本专题详情页）
+     */
     private ExploreTarget target;
 
     private String contentHash;

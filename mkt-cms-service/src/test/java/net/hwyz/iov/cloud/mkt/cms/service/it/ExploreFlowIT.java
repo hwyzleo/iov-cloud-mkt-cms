@@ -73,6 +73,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -150,6 +151,7 @@ class ExploreFlowIT {
         jdbcTemplate.update("DELETE FROM cms_explore_page_component");
         jdbcTemplate.update("DELETE FROM cms_explore_page_current");
         jdbcTemplate.update("DELETE FROM cms_explore_page");
+        jdbcTemplate.update("DELETE FROM cms_explore_topic_image");
         jdbcTemplate.update("DELETE FROM cms_explore_topic_item");
         jdbcTemplate.update("DELETE FROM cms_explore_topic_revision");
         jdbcTemplate.update("DELETE FROM cms_explore_topic");
@@ -168,7 +170,8 @@ class ExploreFlowIT {
                 "cms_explore_article_revision", "cms_explore_topic", "cms_explore_topic_revision",
                 "cms_explore_topic_item", "cms_explore_banner", "cms_explore_banner_revision",
                 "cms_explore_page", "cms_explore_page_component", "cms_explore_page_item",
-                "cms_explore_page_current", "cms_explore_article_image", "cms_explore_operation"}) {
+                "cms_explore_page_current", "cms_explore_article_image", "cms_explore_topic_image",
+                "cms_explore_operation"}) {
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement statement = connection.prepareStatement(
                          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() "
@@ -187,6 +190,7 @@ class ExploreFlowIT {
         assertEquals(1, countIndex("cms_explore_page", "uk_page_request_id"));
         assertEquals(1, countIndex("cms_explore_page_item", "idx_item_cursor"));
         assertEquals(1, countIndex("cms_explore_article_image", "uk_article_image_sort"));
+        assertEquals(1, countIndex("cms_explore_topic_image", "uk_topic_image_sort"));
         assertEquals(0, countIndex("cms_explore_page_component", "uk_component_page_type"));
     }
 
@@ -608,6 +612,196 @@ class ExploreFlowIT {
                 .objectId(created.getTopic().getTopicId())
                 .operator(OPERATOR)
                 .build());
+    }
+
+    private ExploreTarget target(ExploreTargetType type, String refId, String revisionId) {
+        return ExploreTarget.builder()
+                .type(type)
+                .refId(refId)
+                .revisionId(revisionId)
+                .build();
+    }
+
+    @Test
+    @DisplayName("AT-022：专题图集保存、回显与草稿替换事务")
+    void 专题图集() {
+        ExploreArticleView article = publishedArticle("专题图集文章", "<p>正文</p>");
+        ExploreTopicView created = topicAppService.create(ExploreTopicCmd.builder()
+                .name("图集专题")
+                .summary("图集摘要")
+                .images(List.of(testImage("https://assets.example/t1.png", "image/png"),
+                        testImage("https://assets.example/t2.png", "image/png")))
+                .articleRevisionIds(List.of(article.getRevision().getRevisionId()))
+                .operator(OPERATOR)
+                .build());
+        assertEquals(2, created.getRevision().getImages().size());
+        assertEquals("https://assets.example/t1.png", created.getRevision().getCover().getUrl());
+
+        ExploreTopicView published = topicAppService.publish(ExploreContentPublishCmd.builder()
+                .objectId(created.getTopic().getTopicId()).operator(OPERATOR).build());
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cms_explore_topic_image WHERE topic_revision_id = ?",
+                Integer.class, published.getRevision().getRevisionId()));
+
+        Map<String, Object> detail = mobileQueryAppService.topicDetail(
+                published.getTopic().getTopicId(), published.getRevision().getRevisionId(), null, 10);
+        assertEquals(2, detail.get("imageCount"));
+        assertEquals("TWO_COLUMNS", detail.get("imageLayout"));
+        assertEquals(2, ((List<?>) detail.get("images")).size());
+
+        ExploreTopicView updated = topicAppService.update(ExploreTopicCmd.builder()
+                .topicId(published.getTopic().getTopicId())
+                .name("图集专题")
+                .summary("图集摘要")
+                .images(List.of(testImage("https://assets.example/t3.png", "image/png")))
+                .articleRevisionIds(List.of(article.getRevision().getRevisionId()))
+                .lockVersion(published.getTopic().getLockVersion())
+                .operator(OPERATOR)
+                .build());
+        assertEquals(1, updated.getRevision().getImages().size());
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cms_explore_topic_image WHERE topic_revision_id = ?",
+                Integer.class, updated.getRevision().getRevisionId()));
+
+        ExploreException tooMany = assertThrows(ExploreException.class,
+                () -> topicAppService.create(ExploreTopicCmd.builder()
+                        .name("超过九图专题")
+                        .images(java.util.stream.IntStream.rangeClosed(1, 10)
+                                .mapToObj(index -> testImage("https://assets.example/t" + index + ".png",
+                                        "image/png")).toList())
+                        .operator(OPERATOR)
+                        .build()));
+        assertEquals(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT, tooMany.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("AT-023：跳转模式互斥（非专题详情不得关联文章）")
+    void 专题跳转互斥() {
+        ExploreArticleView article = publishedArticle("互斥文章", "<p>正文</p>");
+        ExploreException conflict = assertThrows(ExploreException.class,
+                () -> topicAppService.create(ExploreTopicCmd.builder()
+                        .name("文章详情专题")
+                        .target(target(ExploreTargetType.ARTICLE, article.getArticle().getArticleId(),
+                                article.getRevision().getRevisionId()))
+                        .articleRevisionIds(List.of(article.getRevision().getRevisionId()))
+                        .operator(OPERATOR)
+                        .build()));
+        assertEquals(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT, conflict.getErrorCode());
+
+        ExploreTopicView articleMode = topicAppService.create(ExploreTopicCmd.builder()
+                .name("文章详情专题")
+                .target(target(ExploreTargetType.ARTICLE, article.getArticle().getArticleId(),
+                        article.getRevision().getRevisionId()))
+                .articleRevisionIds(List.of())
+                .operator(OPERATOR)
+                .build());
+        ExploreTopicView published = topicAppService.publish(ExploreContentPublishCmd.builder()
+                .objectId(articleMode.getTopic().getTopicId()).operator(OPERATOR).build());
+        assertEquals(ExploreTargetType.ARTICLE, published.getRevision().getTarget().getType());
+
+        ExploreException otherTopic = assertThrows(ExploreException.class,
+                () -> topicAppService.create(ExploreTopicCmd.builder()
+                        .name("其他专题目标")
+                        .target(target(ExploreTargetType.TOPIC, "tp_other", "tr_other"))
+                        .operator(OPERATOR)
+                        .build()));
+        assertEquals(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT, otherTopic.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("AT-024：专题卡片目标与图集在页面发布时物化，旧发布版本不变")
+    void 专题卡片目标发布物化() {
+        ExploreArticleView article = publishedArticle("物化文章", "<p>正文</p>");
+        ExploreTopicView topic = publishedTopic("物化专题", article);
+        ExploreTopicView articleMode = topicAppService.update(ExploreTopicCmd.builder()
+                .topicId(topic.getTopic().getTopicId())
+                .name("物化专题")
+                .summary("摘要")
+                .images(List.of(testImage("https://assets.example/m1.png", "image/png")))
+                .target(target(ExploreTargetType.ARTICLE, article.getArticle().getArticleId(),
+                        article.getRevision().getRevisionId()))
+                .articleRevisionIds(List.of())
+                .lockVersion(topic.getTopic().getLockVersion())
+                .operator(OPERATOR)
+                .build());
+        ExploreTopicView articleModePublished = topicAppService.publish(ExploreContentPublishCmd.builder()
+                .objectId(articleMode.getTopic().getTopicId()).operator(OPERATOR).build());
+
+        savePage(0, List.of(topicComponent(articleModePublished)));
+        ExplorePublishResult firstRelease = publishPage("req-cr004-1", null, "IMMEDIATE", null, null);
+        assertEquals("ARTICLE", jdbcTemplate.queryForObject(
+                "SELECT i.target_type FROM cms_explore_page_item i"
+                        + " JOIN cms_explore_page_component c ON c.component_id = i.component_id"
+                        + " WHERE c.page_id = ? AND i.item_type = 'TOPIC'",
+                String.class, firstRelease.getPage().getPageId()));
+
+        ExploreTopicView backToDetail = topicAppService.update(ExploreTopicCmd.builder()
+                .topicId(articleModePublished.getTopic().getTopicId())
+                .name("物化专题")
+                .summary("摘要")
+                .images(List.of(testImage("https://assets.example/m1.png", "image/png")))
+                .articleRevisionIds(List.of(article.getRevision().getRevisionId()))
+                .lockVersion(articleModePublished.getTopic().getLockVersion())
+                .operator(OPERATOR)
+                .build());
+        ExploreTopicView detailPublished = topicAppService.publish(ExploreContentPublishCmd.builder()
+                .objectId(backToDetail.getTopic().getTopicId()).operator(OPERATOR).build());
+
+        ExplorePageData draft = savePage(1, List.of(topicComponent(detailPublished)));
+        assertEquals("TOPIC", jdbcTemplate.queryForObject(
+                "SELECT i.target_type FROM cms_explore_page_item i"
+                        + " JOIN cms_explore_page_component c ON c.component_id = i.component_id"
+                        + " WHERE c.page_id = ?",
+                String.class, draft.getPage().getPageId()));
+        ExplorePublishResult secondRelease = publishPage("req-cr004-2",
+                firstRelease.getPage().getPageId(), "IMMEDIATE", null, null);
+        assertEquals("TOPIC", jdbcTemplate.queryForObject(
+                "SELECT i.target_type FROM cms_explore_page_item i"
+                        + " JOIN cms_explore_page_component c ON c.component_id = i.component_id"
+                        + " WHERE c.page_id = ?",
+                String.class, secondRelease.getPage().getPageId()));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cms_explore_page_item i"
+                        + " JOIN cms_explore_page_component c ON c.component_id = i.component_id"
+                        + " WHERE c.page_id = ? AND i.target_type = 'ARTICLE'",
+                Integer.class, firstRelease.getPage().getPageId()));
+    }
+
+    @Test
+    @DisplayName("AT-025：V1.1.4 封面回填防重与异常 TOPIC 目标清理")
+    void 专题图集迁移兼容() {
+        ExploreArticleView article = publishedArticle("迁移文章", "<p>正文</p>");
+        ExploreTopicView topic = publishedTopic("迁移专题", article);
+        String revisionId = topic.getRevision().getRevisionId();
+        String backfill = "INSERT INTO cms_explore_topic_image"
+                + " (topic_revision_id, sort_no, url, width, height, mime, size)"
+                + " SELECT revision_id, 10, cover_url, cover_width, cover_height, cover_mime, cover_size"
+                + " FROM cms_explore_topic_revision"
+                + " WHERE cover_url IS NOT NULL AND cover_url <> ''"
+                + " AND cover_width IS NOT NULL AND cover_height IS NOT NULL"
+                + " AND cover_mime IS NOT NULL AND cover_size IS NOT NULL"
+                + " AND NOT EXISTS (SELECT 1 FROM cms_explore_topic_image i"
+                + " WHERE i.topic_revision_id = cms_explore_topic_revision.revision_id)";
+        jdbcTemplate.update("UPDATE cms_explore_topic_revision SET cover_url = ?,"
+                        + " cover_width = 1200, cover_height = 800, cover_mime = 'image/png', cover_size = 1024"
+                        + " WHERE revision_id = ?",
+                "https://assets.example/legacy-topic.png", revisionId);
+
+        jdbcTemplate.update(backfill);
+        jdbcTemplate.update(backfill);
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cms_explore_topic_image WHERE topic_revision_id = ?",
+                Integer.class, revisionId));
+
+        jdbcTemplate.update("UPDATE cms_explore_topic_revision SET target_type = 'TOPIC',"
+                + " target_ref_id = 'tp_other', target_revision_id = 'tr_other' WHERE revision_id = ?", revisionId);
+        jdbcTemplate.update("UPDATE cms_explore_topic_revision SET target_type = NULL,"
+                + " target_ref_id = NULL, target_revision_id = NULL"
+                + " WHERE target_type = 'TOPIC' AND target_ref_id IS NOT NULL"
+                + " AND target_ref_id <> topic_id");
+        assertNull(jdbcTemplate.queryForObject(
+                "SELECT target_type FROM cms_explore_topic_revision WHERE revision_id = ?",
+                String.class, revisionId));
     }
 
     private ExploreBannerView publishedBanner(ExploreArticleView article) {

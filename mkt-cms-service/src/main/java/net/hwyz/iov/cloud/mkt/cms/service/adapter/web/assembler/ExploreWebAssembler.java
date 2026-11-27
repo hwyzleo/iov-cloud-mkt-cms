@@ -95,6 +95,8 @@ public final class ExploreWebAssembler {
                 .name(request.getName())
                 .summary(request.getSummary())
                 .cover(toImage(request.getCover()))
+                .images(request.getImages() == null ? null : request.getImages().stream()
+                        .map(ExploreWebAssembler::toImage).toList())
                 .target(toTarget(request.getTarget()))
                 .articleRevisionIds(request.getArticleRevisionIds())
                 .lockVersion(request.getLockVersion())
@@ -333,7 +335,11 @@ public final class ExploreWebAssembler {
                 ? null : revision.getStatus().name());
         view.put("name", revision == null ? null : revision.getName());
         view.put("summary", revision == null ? null : revision.getSummary());
-        view.put("cover", image(revision == null ? null : revision.getCover()));
+        List<ExploreImage> images = topicImages(revision);
+        view.put("cover", image(images.isEmpty() ? null : images.get(0)));
+        view.put("images", images.stream().map(ExploreWebAssembler::image).toList());
+        view.put("imageCount", images.size());
+        view.put("imageLayout", ExploreImageLayout.of(images.size()));
         view.put("target", revision == null || revision.getTarget() == null
                 ? null : revision.getTarget().toView());
         view.put("publishedAt", revision == null ? null : iso(revision.getPublishedAt()));
@@ -409,6 +415,17 @@ public final class ExploreWebAssembler {
     }
 
     private static List<ExploreImage> articleImages(ExploreArticleRevision revision) {
+        if (revision == null) {
+            return List.of();
+        }
+        List<ExploreImage> images = revision.getImages();
+        if ((images == null || images.isEmpty()) && revision.getCover() != null) {
+            return List.of(revision.getCover());
+        }
+        return images == null ? List.of() : images;
+    }
+
+    private static List<ExploreImage> topicImages(ExploreTopicRevision revision) {
         if (revision == null) {
             return List.of();
         }

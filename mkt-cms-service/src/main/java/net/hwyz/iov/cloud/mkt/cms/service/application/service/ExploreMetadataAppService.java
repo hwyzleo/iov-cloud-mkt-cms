@@ -54,6 +54,7 @@ public class ExploreMetadataAppService {
         constraints.put("maxSummaryLength", 1024);
         constraints.put("maxPageComponents", 20);
         constraints.put("maxArticleImages", 9);
+        constraints.put("maxTopicImages", 9);
         constraints.put("topicColumns", List.of(2, 3, 4));
         constraints.put("feedPageSizeDefault", properties.getFeedPageSizeDefault());
         constraints.put("feedPageSizeMax", properties.getFeedPageSizeMax());

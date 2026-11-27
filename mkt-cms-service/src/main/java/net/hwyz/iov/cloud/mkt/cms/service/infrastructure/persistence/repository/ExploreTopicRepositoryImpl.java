@@ -6,21 +6,27 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import net.hwyz.iov.cloud.mkt.cms.service.common.enums.ExploreRevisionStatus;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreContentSearchCriteria;
+import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreImage;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopic;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopicItem;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.model.ExploreTopicRevision;
 import net.hwyz.iov.cloud.mkt.cms.service.domain.repository.ExploreTopicRepository;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.converter.ExploreConverter;
+import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExploreTopicImageMapper;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExploreTopicItemMapper;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExploreTopicMapper;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.mapper.ExploreTopicRevisionMapper;
+import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreTopicImagePo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreTopicItemPo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreTopicPo;
 import net.hwyz.iov.cloud.mkt.cms.service.infrastructure.persistence.po.ExploreTopicRevisionPo;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -36,6 +42,7 @@ public class ExploreTopicRepositoryImpl implements ExploreTopicRepository {
     private final ExploreTopicMapper topicMapper;
     private final ExploreTopicRevisionMapper revisionMapper;
     private final ExploreTopicItemMapper itemMapper;
+    private final ExploreTopicImageMapper imageMapper;
 
     @Override
     public void insert(ExploreTopic topic) {
@@ -195,5 +202,61 @@ public class ExploreTopicRepositoryImpl implements ExploreTopicRepository {
                         .in("topic_id", topicIds)).stream()
                 .map(ExploreConverter::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public void replaceRevisionImages(String topicRevisionId, List<ExploreImage> images) {
+        imageMapper.delete(new QueryWrapper<ExploreTopicImagePo>()
+                .eq("topic_revision_id", topicRevisionId));
+        if (images == null || images.isEmpty()) {
+            return;
+        }
+        int sortNo = 10;
+        for (ExploreImage image : images) {
+            ExploreTopicImagePo po = new ExploreTopicImagePo();
+            po.setTopicRevisionId(topicRevisionId);
+            po.setSortNo(sortNo);
+            po.setUrl(image.getUrl());
+            po.setWidth(image.getWidth());
+            po.setHeight(image.getHeight());
+            po.setMime(image.getMime());
+            po.setSize(image.getSize());
+            imageMapper.insert(po);
+            sortNo += 10;
+        }
+    }
+
+    @Override
+    public List<ExploreImage> findRevisionImages(String topicRevisionId) {
+        return imageMapper.selectList(new QueryWrapper<ExploreTopicImagePo>()
+                        .eq("topic_revision_id", topicRevisionId)
+                        .orderByAsc("sort_no")).stream()
+                .map(ExploreTopicRepositoryImpl::image)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Map<String, List<ExploreImage>> findRevisionImagesByIds(Collection<String> topicRevisionIds) {
+        if (topicRevisionIds == null || topicRevisionIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<ExploreImage>> result = new LinkedHashMap<>();
+        for (ExploreTopicImagePo po : imageMapper.selectList(new QueryWrapper<ExploreTopicImagePo>()
+                .in("topic_revision_id", topicRevisionIds)
+                .orderByAsc("topic_revision_id", "sort_no"))) {
+            result.computeIfAbsent(po.getTopicRevisionId(), key -> new java.util.ArrayList<>())
+                    .add(image(po));
+        }
+        return result;
+    }
+
+    private static ExploreImage image(ExploreTopicImagePo po) {
+        return ExploreImage.builder()
+                .url(po.getUrl())
+                .width(po.getWidth())
+                .height(po.getHeight())
+                .mime(po.getMime())
+                .size(po.getSize())
+                .build();
     }
 }

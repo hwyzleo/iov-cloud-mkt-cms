@@ -52,6 +52,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ExploreTopicAppService {
 
+    /**
+     * 专题图集上限（与文章图集一致）
+     */
+    private static final int MAX_TOPIC_IMAGES = 9;
+
     private final ExploreTopicRepository topicRepository;
     private final ExploreArticleRepository articleRepository;
     private final ExploreOperationRepository operationRepository;
@@ -60,11 +65,19 @@ public class ExploreTopicAppService {
     private final Clock clock;
 
     public List<ExploreTopicView> search(ExploreContentSearchCriteria criteria) {
-        return ExplorePageList.map(topicRepository.search(criteria), topic -> {
+        List<ExploreTopic> topics = topicRepository.search(criteria);
+        Map<String, ExploreTopicRevision> revisionsByTopic = new LinkedHashMap<>();
+        List<String> revisionIds = new ArrayList<>();
+        for (ExploreTopic topic : topics) {
             ExploreTopicRevision revision = latestRevision(topic);
-            return new ExploreTopicView(topic, revision,
-                    revision == null ? List.of() : topicRepository.listItems(revision.getRevisionId()));
-        });
+            if (revision == null) {
+                continue;
+            }
+            revisionsByTopic.put(topic.getTopicId(), revision);
+            revisionIds.add(revision.getRevisionId());
+        }
+        Map<String, List<ExploreImage>> images = topicRepository.findRevisionImagesByIds(revisionIds);
+        return ExplorePageList.map(topics, topic -> buildView(topic, revisionsByTopic.get(topic.getTopicId()), images));
     }
 
     public ExploreTopicView get(String topicId) {
@@ -72,8 +85,22 @@ public class ExploreTopicAppService {
                 .orElseThrow(() -> new ExploreException(ExploreErrorCode.EXPLORE_CONTENT_NOT_FOUND,
                         "专题不存在: " + topicId));
         ExploreTopicRevision revision = latestRevision(topic);
-        return new ExploreTopicView(topic, revision,
-                revision == null ? List.of() : topicRepository.listItems(revision.getRevisionId()));
+        if (revision == null) {
+            return new ExploreTopicView(topic, null, List.of());
+        }
+        return new ExploreTopicView(topic,
+                withImages(revision, topicRepository.findRevisionImages(revision.getRevisionId())),
+                topicRepository.listItems(revision.getRevisionId()));
+    }
+
+    private ExploreTopicView buildView(ExploreTopic topic, ExploreTopicRevision revision,
+                                       Map<String, List<ExploreImage>> images) {
+        if (revision == null) {
+            return new ExploreTopicView(topic, null, List.of());
+        }
+        return new ExploreTopicView(topic,
+                withImages(revision, images == null ? null : images.get(revision.getRevisionId())),
+                topicRepository.listItems(revision.getRevisionId()));
     }
 
     /**
@@ -91,6 +118,7 @@ public class ExploreTopicAppService {
         ExploreTopicRevision revision = buildRevision(topicId, 1, cmd, operator, now);
         topicRepository.insert(topic);
         topicRepository.insertRevision(revision);
+        topicRepository.replaceRevisionImages(revision.getRevisionId(), revision.getImages());
         topicRepository.replaceItems(revision.getRevisionId(),
                 buildItems(revision.getRevisionId(), cmd.getArticleRevisionIds(), operator, now));
         audit(ExploreAction.CREATE, topicId, operator, now, null);
@@ -130,12 +158,14 @@ public class ExploreTopicAppService {
                 throw new ExploreException(ExploreErrorCode.EXPLORE_VERSION_CONFLICT,
                         "专题草稿修订已被并发修改，请重试");
             }
+            topicRepository.replaceRevisionImages(revision.getRevisionId(), revision.getImages());
         } else {
             int nextRevisionNo = topicRepository.findLatestRevision(topicId)
                     .map(latest -> latest.getRevisionNo() + 1)
                     .orElse(1);
             revision = buildRevision(topicId, nextRevisionNo, cmd, operator, now);
             topicRepository.insertRevision(revision);
+            topicRepository.replaceRevisionImages(revision.getRevisionId(), revision.getImages());
         }
         topicRepository.replaceItems(revision.getRevisionId(),
                 buildItems(revision.getRevisionId(), cmd.getArticleRevisionIds(), operator, now));
@@ -175,11 +205,7 @@ public class ExploreTopicAppService {
             throw new ExploreException(ExploreErrorCode.EXPLORE_VERSION_CONFLICT,
                     "已发布修订不可重复发布，请创建新草稿修订");
         }
-        ExploreTarget target = revision.getTarget();
-        if (target != null && target.getType() != null) {
-            targetAppService.validateTopicTarget(target, topicId);
-            targetAppService.validate(target);
-        }
+        validateTopicContentForPublish(revision);
         validateItemsForPublish(revision.getRevisionId());
         Instant now = Instant.now(clock);
         ExploreTopicRevision published = revision.published(operator, now);
@@ -234,14 +260,11 @@ public class ExploreTopicAppService {
                                                String operator, Instant now) {
         String name = ExploreGuard.requireText(cmd.getName(), "专题名称", 128);
         String summary = ExploreGuard.optionalText(cmd.getSummary(), "专题摘要", 1024);
-        ExploreImage cover = cmd.getCover();
-        mediaValidator.validateOptionalImage(cover, "专题封面");
-        ExploreTarget target = cmd.getTarget();
-        if (target != null && target.getType() != null) {
-            targetAppService.validateTopicTarget(target, topicId);
-            targetAppService.validate(target);
-        }
+        List<ExploreImage> images = normalizeImages(cmd);
+        ExploreImage cover = images.isEmpty() ? null : images.get(0);
+        ExploreTarget target = targetAppService.normalizeTopicTarget(topicId, cmd.getTarget());
         List<String> articleRevisionIds = normalizeRevisionIds(cmd.getArticleRevisionIds());
+        requireArticlesAllowed(target, articleRevisionIds);
         return ExploreTopicRevision.builder()
                 .revisionId(ExploreIdGenerator.topicRevisionId())
                 .topicId(topicId)
@@ -250,8 +273,9 @@ public class ExploreTopicAppService {
                 .name(name)
                 .summary(summary)
                 .cover(cover)
+                .images(images)
                 .target(target)
-                .contentHash(contentHash(name, summary, cover, target, articleRevisionIds))
+                .contentHash(contentHash(name, summary, images, target, articleRevisionIds))
                 .createBy(operator)
                 .createTime(now)
                 .modifyBy(operator)
@@ -338,15 +362,105 @@ public class ExploreTopicAppService {
         return ids;
     }
 
-    private String contentHash(String name, String summary, ExploreImage cover, ExploreTarget target,
+    private String contentHash(String name, String summary, List<ExploreImage> images, ExploreTarget target,
                                List<String> articleRevisionIds) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("name", name);
         payload.put("summary", summary);
-        payload.put("coverUrl", cover == null ? null : cover.getUrl());
+        payload.put("images", imageHashPayload(images));
         payload.put("target", target == null ? null : target.toView());
         payload.put("articleRevisionIds", articleRevisionIds);
         return HexSha256.ofUtf8(ExploreJson.write(payload));
+    }
+
+    private List<Map<String, Object>> imageHashPayload(List<ExploreImage> images) {
+        List<Map<String, Object>> payload = new ArrayList<>();
+        for (ExploreImage image : images) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("url", image.getUrl());
+            view.put("width", image.getWidth());
+            view.put("height", image.getHeight());
+            view.put("mime", image.getMime());
+            view.put("size", image.getSize());
+            payload.add(view);
+        }
+        return payload;
+    }
+
+    /**
+     * 规范化专题图集（MKT-CMS-DSN-CR-004 §5.1）
+     * <p>
+     * images 缺省时兼容旧的单封面字段；images 非空时忽略独立 cover。
+     *
+     * @param cmd 新建/修改命令
+     * @return 有序图集
+     */
+    private List<ExploreImage> normalizeImages(ExploreTopicCmd cmd) {
+        List<ExploreImage> images = cmd.getImages() == null ? List.of() : cmd.getImages();
+        if (images.isEmpty() && cmd.getCover() != null) {
+            images = List.of(cmd.getCover());
+        }
+        if (images.size() > MAX_TOPIC_IMAGES) {
+            throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                    "专题图片最多 " + MAX_TOPIC_IMAGES + " 张");
+        }
+        for (int index = 0; index < images.size(); index++) {
+            ExploreImage image = images.get(index);
+            if (image == null) {
+                throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                        "第 " + (index + 1) + " 张图片不能为空");
+            }
+            mediaValidator.validateRequiredImage(image, "第 " + (index + 1) + " 张图片");
+        }
+        return List.copyOf(images);
+    }
+
+    /**
+     * 校验非专题详情模式不得关联文章列表（MKT-CMS-DSN-CR-004 §3.1）
+     *
+     * @param target             已规范化目标（null 表示专题详情模式）
+     * @param articleRevisionIds 文章修订集合
+     */
+    private void requireArticlesAllowed(ExploreTarget target, List<String> articleRevisionIds) {
+        if (target != null && articleRevisionIds != null && !articleRevisionIds.isEmpty()) {
+            throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                    "非专题详情模式的专题不允许关联文章列表");
+        }
+    }
+
+    /**
+     * 发布前复校已持久化修订的目标、图集与文章互斥关系
+     *
+     * @param revision 待发布修订
+     */
+    private void validateTopicContentForPublish(ExploreTopicRevision revision) {
+        ExploreTarget target = targetAppService.normalizeTopicTarget(revision.getTopicId(), revision.getTarget());
+        List<String> articleRevisionIds = topicRepository.listItems(revision.getRevisionId()).stream()
+                .map(ExploreTopicItem::getArticleRevisionId)
+                .toList();
+        requireArticlesAllowed(target, articleRevisionIds);
+        List<ExploreImage> images = topicRepository.findRevisionImages(revision.getRevisionId());
+        if (images.size() > MAX_TOPIC_IMAGES) {
+            throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                    "专题图片最多 " + MAX_TOPIC_IMAGES + " 张");
+        }
+        for (int index = 0; index < images.size(); index++) {
+            mediaValidator.validateRequiredImage(images.get(index), "第 " + (index + 1) + " 张图片");
+        }
+    }
+
+    private ExploreTopicRevision withImages(ExploreTopicRevision revision, List<ExploreImage> images) {
+        if (revision == null) {
+            return null;
+        }
+        List<ExploreImage> safeImages = images == null ? List.of() : images;
+        if (safeImages.isEmpty() && revision.getCover() != null) {
+            safeImages = List.of(revision.getCover());
+        }
+        return revision.toBuilder()
+                .cover(safeImages.isEmpty() ? null : safeImages.get(0))
+                .images(safeImages)
+                .build();
     }
 
     private void audit(ExploreAction action, String topicId, String operator, Instant now, String detail) {

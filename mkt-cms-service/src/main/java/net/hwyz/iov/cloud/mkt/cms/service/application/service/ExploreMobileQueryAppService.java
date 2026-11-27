@@ -272,7 +272,14 @@ public class ExploreMobileQueryAppService {
         view.put("revisionId", revision.getRevisionId());
         view.put("name", revision.getName());
         view.put("summary", revision.getSummary());
-        view.put("cover", imageView(revision.getCover()));
+        List<ExploreImage> images = topicRepository.findRevisionImages(revision.getRevisionId());
+        if (images.isEmpty() && revision.getCover() != null) {
+            images = List.of(revision.getCover());
+        }
+        view.put("cover", imageView(images.isEmpty() ? null : images.get(0)));
+        view.put("images", images.stream().map(this::imageView).toList());
+        view.put("imageCount", images.size());
+        view.put("imageLayout", ExploreImageLayout.of(images.size()));
         view.put("target", revision.getTarget() == null ? Map.of() : revision.getTarget().toView());
         view.put("items", visible.stream()
                 .map(item -> item.getDisplaySnapshot() == null

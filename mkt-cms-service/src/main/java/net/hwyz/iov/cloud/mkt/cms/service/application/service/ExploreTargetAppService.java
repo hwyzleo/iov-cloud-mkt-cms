@@ -62,6 +62,46 @@ public class ExploreTargetAppService {
     }
 
     /**
+     * 规范化专题跳转模式（MKT-CMS-DSN-CR-004 §3.1）。
+     * <p>
+     * 空目标与历史遗留的 TOPIC(self) 均归一为专题详情模式（返回 null）；
+     * 指向其他专题的 TOPIC 目标不再接受；其余类型继续做字段完整性与白名单校验。
+     *
+     * @param topicId 当前专题标识
+     * @param target  专题修订目标（可为空）
+     * @return 规范化目标；null 表示专题详情模式
+     */
+    public ExploreTarget normalizeTopicTarget(String topicId, ExploreTarget target) {
+        if (target == null || target.getType() == null) {
+            return null;
+        }
+        if (target.getType() == ExploreTargetType.TOPIC) {
+            if (StringUtils.hasText(target.getRefId()) && !topicId.equals(target.getRefId())) {
+                throw new ExploreException(ExploreErrorCode.EXPLORE_INVALID_ARGUMENT,
+                        "专题跳转目标不支持指向其他专题，请使用专题详情模式");
+            }
+            return null;
+        }
+        validate(target);
+        return target;
+    }
+
+    /**
+     * 构造专题详情目标（卡片跳转本专题详情页）
+     *
+     * @param topicId    专题标识
+     * @param revisionId 修订标识
+     * @return 专题详情目标
+     */
+    public ExploreTarget topicDetailTarget(String topicId, String revisionId) {
+        return ExploreTarget.builder()
+                .type(ExploreTargetType.TOPIC)
+                .refId(topicId)
+                .revisionId(revisionId)
+                .build();
+    }
+
+    /**
      * 校验专题目标，拒绝自引用与一跳循环
      *
      * @param target        目标

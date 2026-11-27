@@ -24,6 +24,8 @@ public class ExploreTopicCmd {
 
     private final ExploreImage cover;
 
+    private final List<ExploreImage> images;
+
     private final ExploreTarget target;
 
     private final List<String> articleRevisionIds;

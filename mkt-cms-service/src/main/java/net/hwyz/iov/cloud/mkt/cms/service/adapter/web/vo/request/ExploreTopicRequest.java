@@ -20,6 +20,11 @@ public class ExploreTopicRequest {
 
     private ExploreImageRequest cover;
 
+    /**
+     * 有序图集（最多 9 张；首张为封面）。与文章图集字段一致。
+     */
+    private List<ExploreImageRequest> images;
+
     private ExploreTargetRequest target;
 
     private List<String> articleRevisionIds;

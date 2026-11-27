@@ -84,24 +84,30 @@ public final class ExploreDisplaySnapshot {
     }
 
     /**
-     * 专题卡片快照（目标固定为专题自身详情）
+     * 专题卡片快照（MKT-CMS-DSN-CR-004 §4.1：图集 + 已解析跳转目标）
      *
      * @param topicId    专题标识
      * @param revisionId 修订标识
      * @param name       名称
      * @param summary    摘要
-     * @param cover      封面
+     * @param images     有序图集
+     * @param target     已解析跳转目标（为空时回退为专题自身详情）
      * @return 快照
      */
     public static Map<String, Object> topic(String topicId, String revisionId, String name,
-                                            String summary, ExploreImage cover) {
+                                            String summary, List<ExploreImage> images,
+                                            ExploreTarget target) {
         Map<String, Object> snapshot = base("TOPIC");
         snapshot.put("topicId", topicId);
         snapshot.put("revisionId", revisionId);
         snapshot.put("name", name);
         snapshot.put("summary", summary);
-        putImage(snapshot, "cover", cover);
-        snapshot.put("target", topicTarget(topicId, revisionId));
+        List<ExploreImage> safeImages = images == null ? List.of() : images;
+        putImage(snapshot, "cover", safeImages.isEmpty() ? null : safeImages.get(0));
+        snapshot.put("images", safeImages.stream().map(ExploreDisplaySnapshot::imageView).toList());
+        snapshot.put("imageCount", safeImages.size());
+        snapshot.put("imageLayout", ExploreImageLayout.of(safeImages.size()));
+        snapshot.put("target", target == null ? topicTarget(topicId, revisionId) : target.toView());
         return snapshot;
     }
 
